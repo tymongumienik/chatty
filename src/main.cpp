@@ -2,6 +2,8 @@
 #include "ftxui/component/screen_interactive.hpp"
 #include "ftxui/dom/elements.hpp"
 
+#include "constants.hpp"
+
 int main() {
   using namespace ftxui;
 
@@ -25,7 +27,16 @@ int main() {
   auto renderer = Renderer(container, [&] {
     if (!joined) {
       return center(vbox({
-          text("Enter your username and press enter to confirm"),
+          vbox(([&]() {
+            Elements art_nodes;
+            for (const auto& line : ASCII_ART) {
+                art_nodes.push_back(text(std::string(line)));
+            }
+            return art_nodes;
+          })()) | hcenter,
+          filler(),
+          text("Enter your username and press ENTER to confirm"),
+          filler(),
           name_input->Render(),
       }));
     }
