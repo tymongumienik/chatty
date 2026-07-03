@@ -19,7 +19,15 @@ FetchContent_Declare(ftxui
 )
 FetchContent_MakeAvailable(ftxui)
 
-add_executable(chatty src/main.cpp src/app.cpp)
+add_executable(chatty
+  src/main.cpp
+  src/app.cpp
+  src/screens/name_input.cpp
+  src/screens/waiting_for_peer.cpp
+  src/screens/chat_screen.cpp
+)
+
+target_include_directories(chatty PRIVATE src)
 
 target_link_libraries(chatty
   PRIVATE ftxui::screen
