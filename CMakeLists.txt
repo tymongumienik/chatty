@@ -19,7 +19,7 @@ FetchContent_Declare(ftxui
 )
 FetchContent_MakeAvailable(ftxui)
 
-add_executable(chatty src/main.cpp)
+add_executable(chatty src/main.cpp src/app.cpp)
 
 target_link_libraries(chatty
   PRIVATE ftxui::screen
