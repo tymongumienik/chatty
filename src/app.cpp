@@ -1,3 +1,7 @@
+#include <memory>
+
+#include "ftxui/component/component_base.hpp"
+#include "ftxui/dom/elements.hpp"
 #include "ftxui/screen/color.hpp"
 
 #include "app.hpp"
@@ -55,16 +59,18 @@ ftxui::Component App::MakeWaitingForPeerScreen() {
     using namespace ftxui;
 
     auto back_btn = Button("Back", [this] { SetStage(AppStage::NameInput); });
+    auto skip_btn = Button("Skip", [this] { SetStage(AppStage::Chatting); });
 
-    auto container = Container::Vertical({back_btn});
+    auto container = Container::Vertical({back_btn, skip_btn});
 
-    return Renderer(container, [this, back_btn] {
+    return Renderer(container, [this, back_btn, skip_btn] {
         return center(vbox({
             text("Connected as: " + state_.username),
             filler(),
             text("Waiting for a peer to connect..."), // not implemented yet :)
             filler(),
             back_btn->Render(),
+            skip_btn->Render(),
         }));
     });
 }
@@ -72,15 +78,101 @@ ftxui::Component App::MakeWaitingForPeerScreen() {
 ftxui::Component App::MakeChatScreen() {
     using namespace ftxui;
 
-    auto exit_btn = Button("Exit", [this] { screen_.ExitLoopClosure()(); });
+    struct Message {
+        std::string user;
+        std::string text;
+        bool mine;
+    };
 
-    auto container = Container::Vertical({exit_btn});
+    // solution to scrollable table from https://github.com/ArthurSonzogni/FTXUI/discussions/757#discussioncomment-9760396, adjusted for v7.0.0 (OnRender instead of Render)
+    class MessageComponent : public ComponentBase {
+    public:
+        MessageComponent(Message msg) : msg_(msg) {}
 
-    return Renderer(container, [this, exit_btn] {
-        return vbox({
-            hbox({filler(), text("Welcome to Chatty, " + state_.username + "!"), filler()}),
-            filler(),
-            hbox({filler(), exit_btn->Render(), filler()}),
-        });
+    private:
+        Element OnRender() final {
+            auto bubble =
+                vbox(Elements{
+                    text(msg_.user) | bold,
+                    paragraph(msg_.text),
+                }) |
+                borderRounded |
+                size(WIDTH, LESS_THAN, 50);
+
+            if (Focused()) {
+                bubble = focus(bubble);
+            } else if (Active()) {
+                bubble = select(bubble);
+            }
+
+            return msg_.mine
+                ? hbox(Elements{filler(), bubble | bgcolor(Color::Blue)}) // align right 
+                : hbox(Elements{bubble | bgcolor(Color::GrayDark), filler()}); // align left 
+        }
+
+        bool Focusable() const final { return true; }
+
+        Message msg_;
+    };
+
+    auto messages_container = Container::Vertical({});
+
+    messages_container->Add(Make<MessageComponent>(Message{"Janusz", "Test", false}));
+    messages_container->Add(Make<MessageComponent>(Message{"You", "It works yay", true}));
+
+    auto input_text = std::make_shared<std::string>();
+    auto input = Input(input_text.get(), InputOption { .placeholder = "Type a message..." });
+
+    auto send_message = [messages_container, input_text] {
+        if (input_text->empty())
+            return;
+        messages_container->Add(Make<MessageComponent>(Message{"You", *input_text, true}));
+        input_text->clear();
+    };
+
+    auto send_btn = Button("Send", send_message);
+    auto exit_btn = Button("Exit", [this] {
+        screen_.ExitLoopClosure()();
     });
+
+    auto bottom_bar = Container::Horizontal({
+        input,
+        send_btn,
+        exit_btn,
+    });
+
+    auto container = Container::Vertical({
+        messages_container,
+        bottom_bar,
+    });
+
+    return CatchEvent(
+        Renderer(container, [this, input, send_btn, exit_btn, messages_container] {
+            return vbox({
+                hbox({
+                    filler(),
+                    text(std::format("Welcome to Chatty, {}!", state_.username)) | bold,
+                    filler(),
+                }),
+                separator(),
+                messages_container->Render() | vscroll_indicator | frame | flex,
+                hbox({
+                    text(" "),
+                    input->Render() | flex,
+                    text(" "),
+                    send_btn->Render(),
+                    text(" "),
+                    exit_btn->Render(),
+                    text(" "),
+                }) | border,
+            });
+        }),
+        [send_message](Event event) {
+            if (event == Event::Return) {
+                send_message();
+                return true;
+            }
+            return false;
+        }
+    );
 }
