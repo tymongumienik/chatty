@@ -12,9 +12,10 @@ int main() {
   std::string name;
   bool joined = false;
 
-  InputOption input_opts;
-  input_opts.on_enter = [&] { joined = true; };
-  input_opts.multiline = false;
+  InputOption input_opts {
+    .multiline = false,
+    .on_enter = [&] { joined = true; },
+  };
 
   auto name_input = Input(&name, "username", input_opts);
   auto exit_btn = Button("Exit", [&]() { screen.ExitLoopClosure()(); });
@@ -26,19 +27,22 @@ int main() {
 
   auto renderer = Renderer(container, [&] {
     if (!joined) {
-      return center(vbox({
-          vbox(([&]() {
-            Elements art_nodes;
-            for (const auto& line : ASCII_ART) {
-                art_nodes.push_back(text(std::string(line)));
-            }
-            return art_nodes;
-          })()) | hcenter,
-          filler(),
-          text("Enter your username and press ENTER to confirm"),
-          filler(),
-          name_input->Render(),
-      }));
+      return center(
+          vbox({
+            vbox(([&]() {
+              Elements art_nodes;
+              for (const auto& line : ASCII_ART) {
+                  art_nodes.push_back(text(std::string(line)));
+              }
+              return art_nodes;
+            })()) | hcenter,
+
+            filler(),
+
+            text("Enter your username and press ENTER to confirm"),
+            name_input->Render() | size(WIDTH, EQUAL, 35) | hcenter,
+        }) | flex
+      );
     }
 
     return vbox({
