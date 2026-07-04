@@ -24,7 +24,7 @@ ftxui::Component App::MakeNameInputScreen() {
 
   return Renderer(container, [this, input] {
     Elements art_nodes;
-    for (const auto& line : ASCII_ART) {
+    for (const auto& line : Constants::ASCII_ART) {
       art_nodes.push_back(text(std::string(line)));
     }
 

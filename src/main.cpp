@@ -1,4 +1,6 @@
+#include <print>
 #include "app.hpp"
+#include "uniqueid.hpp"
 
 int main() {
   App app;
