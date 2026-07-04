@@ -10,7 +10,7 @@ ftxui::Component App::MakeNameInputScreen() {
 
     auto input = Input(&state_.username, "username", InputOption{
         .transform = [](InputState s) {
-            return s.element | bgcolor(Color::Black) | color(Color::White);
+            return s.element | bgcolor(Color::Default) | color(Color::White);
         },
         .multiline = false,
         .on_enter = [this] { SetStage(AppStage::WaitingForPeer); },

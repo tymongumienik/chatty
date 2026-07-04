@@ -52,7 +52,12 @@ ftxui::Component App::MakeChatScreen() {
     messages_container->Add(Make<MessageComponent>(Message{"You", "It works yay", true}));
 
     auto input_text = std::make_shared<std::string>();
-    auto input = Input(input_text.get(), InputOption { .placeholder = "Type a message..." });
+    auto input = Input(input_text.get(), InputOption {
+        .placeholder = "Type a message...",
+        .transform = [](InputState s) {
+            return s.element | bgcolor(Color::Default);
+        },
+    });
 
     auto send_message = [messages_container, input_text] {
         if (input_text->empty())
@@ -77,6 +82,7 @@ ftxui::Component App::MakeChatScreen() {
         messages_container,
         bottom_bar,
     });
+    container->SetActiveChild(bottom_bar);
 
     return CatchEvent(
         Renderer(container, [this, input, send_btn, exit_btn, messages_container] {
@@ -99,8 +105,8 @@ ftxui::Component App::MakeChatScreen() {
                 }) | border,
             });
         }),
-        [send_message](Event event) {
-            if (event == Event::Return) {
+        [send_message, input](Event event) {
+            if (event == Event::Return && input->Active()) {
                 send_message();
                 return true;
             }
