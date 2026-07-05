@@ -117,4 +117,4 @@ void Client::NetworkLoop(std::stop_token st) {
   }
 }
 
-};  // namespace Networking
+}  // namespace Networking

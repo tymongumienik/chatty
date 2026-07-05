@@ -13,11 +13,12 @@ Networking::UdpSocket::UdpSocket(std::uint16_t port)
 
   int yes = 1;
 
-  // TODO: more exceptions
-
-  ::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-  ::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
-  ::setsockopt(fd_.get(), SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
+  if (::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
+    throw std::runtime_error("UDP setsockopt(SO_REUSEADDR) failed");
+  if (::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)) < 0)
+    throw std::runtime_error("UDP setsockopt(SO_REUSEPORT) failed");
+  if (::setsockopt(fd_.get(), SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes)) < 0)
+    throw std::runtime_error("UDP setsockopt(SO_BROADCAST) failed");
 
   int flags = ::fcntl(fd_.get(), F_GETFL);
   if (::fcntl(fd_.get(), F_SETFL, flags | O_NONBLOCK) < 0) {

@@ -25,4 +25,4 @@ class UdpSocket {
   std::uint16_t port_;
   UniqueFileDescriptor::Type fd_;
 };
-};  // namespace Networking
+}  // namespace Networking

@@ -32,4 +32,4 @@ struct DiscoverPacket : Packet {
 
   std::string serialize() const override;
 };
-};  // namespace Networking
+}  // namespace Networking

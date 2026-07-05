@@ -6,7 +6,7 @@ std::string UniqueId::make() {
   std::string result{};
   result.reserve(length);  // for good measure
 
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     result += chars[dist(generator)];
   }
 

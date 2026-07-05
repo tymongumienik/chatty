@@ -23,4 +23,4 @@ constexpr std::array<std::string_view, 6> ASCII_ART = {
     R"(  \___|_| |_|\__,_|\__|\__|\__, |)",
     R"(                           |___/ )"};
 
-};  // namespace Constants
+}  // namespace Constants
