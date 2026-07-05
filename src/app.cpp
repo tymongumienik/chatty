@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "networking/filedescriptor.hpp"
 
 App::App() : screen_(ftxui::ScreenInteractive::Fullscreen()) {}
 

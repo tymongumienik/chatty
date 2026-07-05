@@ -30,9 +30,16 @@ add_executable(chatty
 )
 
 target_include_directories(chatty PRIVATE src)
+include_directories(${PROJECT_SOURCE_DIR}/src)
 
 target_link_libraries(chatty
   PRIVATE ftxui::screen
   PRIVATE ftxui::dom
   PRIVATE ftxui::component
 )
+
+# Tests
+
+enable_testing()
+add_executable(tests src/testing/tests.cpp)
+add_test(NAME Tests COMMAND tests)
