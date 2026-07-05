@@ -24,6 +24,7 @@ add_executable(chatty
   src/app.cpp
   src/uniqueid.cpp
   src/networking/packets.cpp
+  src/networking/client.cpp
   src/screens/name_input.cpp
   src/screens/waiting_for_peer.cpp
   src/screens/chat_screen.cpp

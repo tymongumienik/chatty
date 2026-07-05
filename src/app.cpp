@@ -1,7 +1,11 @@
 #include "app.hpp"
+#include "networking/client.hpp"
 #include "networking/filedescriptor.hpp"
 
-App::App() : screen_(ftxui::ScreenInteractive::Fullscreen()) {}
+App::App()
+    : screen_(ftxui::ScreenInteractive::Fullscreen()),
+      network_(
+          {.on_message = [this]() { screen_.PostEvent(ftxui::Event::Custom); }}) {}
 
 void App::SetStage(AppStage stage) {
   state_.stage = stage;

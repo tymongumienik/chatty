@@ -1,7 +1,10 @@
+#include <format>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "ftxui/component/component.hpp"
+#include "ftxui/component/event.hpp"
 #include "ftxui/dom/elements.hpp"
 #include "ftxui/screen/color.hpp"
 
@@ -10,20 +13,14 @@
 ftxui::Component App::MakeChatScreen() {
   using namespace ftxui;
 
-  struct Message {
-    std::string user;
-    std::string text;
-    bool mine;
-  };
-
   class MessageComponent : public ComponentBase {
    public:
-    MessageComponent(Message msg) : msg_(msg) {}
+    MessageComponent(Message msg) : msg_(std::move(msg)) {}
 
    private:
     Element OnRender() final {
-      auto bubble = vbox(Elements{
-                        text(msg_.user) | bold,
+      auto bubble = vbox({
+                        text(msg_.sender) | bold,
                         paragraph(msg_.text),
                     }) |
                     borderRounded | size(WIDTH, LESS_THAN, 50);
@@ -34,61 +31,49 @@ ftxui::Component App::MakeChatScreen() {
         bubble = select(bubble);
       }
 
-      return msg_.mine
-                 ? hbox(Elements{filler(), bubble | bgcolor(Color::Blue)})
-                 : hbox(Elements{bubble | bgcolor(Color::GrayDark), filler()});
+      return msg_.mine ? hbox({filler(), bubble | bgcolor(Color::Blue)})
+                       : hbox({bubble | bgcolor(Color::GrayDark), filler()});
     }
 
     bool Focusable() const final { return true; }
-
-    Message msg_;
+    const Message msg_;
   };
 
   auto messages_container = Container::Vertical({});
 
-  messages_container->Add(
-      Make<MessageComponent>(Message{"Janusz", "Test", false}));
-  messages_container->Add(
-      Make<MessageComponent>(Message{"You", "It works yay", true}));
-
   auto input_text = std::make_shared<std::string>();
-  auto input = Input(
-      input_text.get(),
-      InputOption{
-          .placeholder = "Type a message...",
-          .transform =
-              [](InputState s) { return s.element | bgcolor(Color::Default); },
-      });
+  auto input =
+      Input(input_text.get(), InputOption{.placeholder = "Type a message..."});
 
-  auto send_message = [messages_container, input_text] {
+  auto append_message_to_ui = [messages_container](Message msg) {
+    messages_container->Add(Make<MessageComponent>(std::move(msg)));
+
+    if (messages_container->ChildCount() > 0) {
+      messages_container->SetActiveChild(
+          messages_container->ChildAt(messages_container->ChildCount() - 1));
+    }
+  };
+
+  auto send_message = [this, append_message_to_ui, input_text] {
     if (input_text->empty())
       return;
-    messages_container->Add(
-        Make<MessageComponent>(Message{"You", *input_text, true}));
-    messages_container->SetActiveChild(
-        messages_container->ChildAt(messages_container->ChildCount() - 1));
+
+    // TODO
+
     input_text->clear();
   };
 
   auto send_btn = Button("Send", send_message);
   auto exit_btn = Button("Exit", [this] { screen_.ExitLoopClosure()(); });
+  auto bottom_bar = Container::Horizontal({input, send_btn, exit_btn});
 
-  auto bottom_bar = Container::Horizontal({
-      input,
-      send_btn,
-      exit_btn,
-  });
-
-  auto container = Container::Vertical({
-      messages_container,
-      bottom_bar,
-  });
-  container->SetActiveChild(bottom_bar);
+  auto main_container = Container::Vertical({messages_container, bottom_bar});
+  main_container->SetActiveChild(bottom_bar);
 
   return CatchEvent(
       Renderer(
-          container,
-          [this, input, send_btn, exit_btn, messages_container] {
+          main_container,
+          [messages_container, bottom_bar, this] {
             return vbox({
                 hbox({
                     filler(),
@@ -99,22 +84,26 @@ ftxui::Component App::MakeChatScreen() {
                 }),
                 separator(),
                 messages_container->Render() | vscroll_indicator | frame | flex,
-                hbox({
-                    text(" "),
-                    input->Render() | flex,
-                    text(" "),
-                    send_btn->Render(),
-                    text(" "),
-                    exit_btn->Render(),
-                    text(" "),
-                }) | border,
+                bottom_bar->Render() | border,
             });
           }),
-      [send_message, input](Event event) {
-        if (event == Event::Return && input->Active()) {
+      [this, send_message, input, append_message_to_ui, messages_container](Event event) {
+        if (event == Event::Return && input->Focused()) {
           send_message();
           return true;
         }
+
+        if (event == Event::Custom) {
+          std::lock_guard lock(state_mutex_);
+
+          while (messages_container->ChildCount() < state_.messages.size()) {
+            size_t index = messages_container->ChildCount();
+            append_message_to_ui(state_.messages[index]);
+          }
+
+          return true;
+        }
+
         return false;
       });
 }

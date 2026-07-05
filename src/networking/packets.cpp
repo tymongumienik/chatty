@@ -4,12 +4,12 @@
 #include <memory>
 #include "constants.hpp"
 
-std::string HelloPacket::serialize() const {
+std::string Networking::HelloPacket::serialize() const {
   return std::format("{} {} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
                      Constants::PROTOCOL_VERSION, tcpPort, instanceId);
 }
 
-std::string DiscoverPacket::serialize() const {
+std::string Networking::DiscoverPacket::serialize() const {
   return std::format("{} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
                      Constants::PROTOCOL_VERSION, instanceId);
 }
@@ -49,7 +49,8 @@ std::string_view next_token(std::string_view& view) {
 }
 }  // namespace
 
-std::unique_ptr<Packet> Packet::parse(const std::string& rawData) {
+std::unique_ptr<Networking::Packet> Networking::Packet::parse(
+    const std::string& rawData) {
   if (rawData.size() > Constants::MAX_PACKET_SIZE || rawData.empty()) {
     return nullptr;
   }
@@ -76,7 +77,7 @@ std::unique_ptr<Packet> Packet::parse(const std::string& rawData) {
     if (!safe_to_uint16(portStr, tcpPort))
       return nullptr;
 
-    auto packet = std::make_unique<HelloPacket>();
+    auto packet = std::make_unique<Networking::HelloPacket>();
     packet->tcpPort = tcpPort;
     packet->instanceId = std::string(instanceId);
     return packet;
@@ -88,7 +89,7 @@ std::unique_ptr<Packet> Packet::parse(const std::string& rawData) {
     if (instanceId.empty() || !view.empty())
       return nullptr;
 
-    auto packet = std::make_unique<DiscoverPacket>();
+    auto packet = std::make_unique<Networking::DiscoverPacket>();
     packet->instanceId = std::string(instanceId);
     return packet;
   }

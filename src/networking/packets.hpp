@@ -6,6 +6,7 @@
 
 #include "constants.hpp"
 
+namespace Networking {
 struct Packet {
   virtual ~Packet() = default;
   virtual std::string getBreadcrumb() const = 0;
@@ -30,3 +31,4 @@ struct DiscoverPacket : Packet {
 
   std::string serialize() const override;
 };
+};  // namespace Networking
