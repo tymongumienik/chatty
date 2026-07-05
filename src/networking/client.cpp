@@ -1,4 +1,5 @@
 #include "client.hpp"
+#include <cstdlib>
 
 namespace Networking {
 Client::Client(Interop interop) : interop_(std::move(interop)) {}
@@ -48,7 +49,7 @@ void Client::NetworkLoop(std::stop_token st) {
     }
 
     if (command.type == Command::Type::SearchPeer) {
-      // search peer using command.payload
+      // system("notify-send \"Chatty\" \"Looking for a peer\"");
     }
 
     if (command.type == Command::Type::SendMessage) {

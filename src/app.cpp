@@ -6,9 +6,14 @@ App::App()
     : screen_(ftxui::ScreenInteractive::Fullscreen()),
       network_({.on_message = [this]() {
         screen_.PostEvent(ftxui::Event::Custom);
-      }}) {}
+      }}) {
+  network_.Start();
+}
 
 void App::SetStage(AppStage stage) {
+  if (stage == AppStage::WaitingForPeer) {
+    network_.SearchPeer(state_.username);
+  }
   state_.stage = stage;
   tab_index_ = static_cast<int>(stage);
 }
