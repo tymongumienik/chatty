@@ -29,7 +29,7 @@ class App {
  private:
   ftxui::ScreenInteractive screen_;
   AppState state_;
-  std::atomic<int> tab_index_ = 0;  // same order as in AppState struct
+  int tab_index_ = 0;
   Networking::Client network_;
   std::mutex state_mutex_;
 

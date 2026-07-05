@@ -5,6 +5,21 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_compile_options(
+    -O2 -Wall -Wextra -Wpedantic
+    -Wformat -Wformat=2 -Werror=format-security
+    -Wimplicit-fallthrough
+    -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
+    -D_GLIBCXX_ASSERTIONS
+    -fstack-clash-protection -fstack-protector-strong
+)
+
+add_link_options(
+    -Wl,-z,nodlopen -Wl,-z,noexecstack
+    -Wl,-z,relro -Wl,-z,now
+    -Wl,--as-needed -Wl,--no-copy-dt-needed-entries
+)
+
 include(FetchContent)
 
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
