@@ -12,8 +12,14 @@ ftxui::Component App::MakeWaitingForPeerScreen() {
   auto container = Container::Vertical({back_btn, skip_btn});
 
   return Renderer(container, [this, back_btn, skip_btn] {
+    std::string username;
+    {
+      std::lock_guard lock(state_mutex_);
+      username = state_.username;
+    }
+
     return center(vbox({
-        text("Connected as: " + state_.username),
+        text("Connected as: " + username),
         filler(),
         text("Waiting for a peer to connect..."),
         filler(),

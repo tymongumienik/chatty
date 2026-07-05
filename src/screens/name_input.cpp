@@ -2,23 +2,38 @@
 #include "ftxui/dom/elements.hpp"
 #include "ftxui/screen/color.hpp"
 
+#include <memory>
+
 #include "app.hpp"
 #include "constants.hpp"
 
 ftxui::Component App::MakeNameInputScreen() {
   using namespace ftxui;
 
-  auto input =
-      Input(&state_.username, "username",
-            InputOption{
-                .transform =
-                    [](InputState s) {
-                      return s.element | bgcolor(Color::Default) |
-                             color(Color::White);
-                    },
-                .multiline = false,
-                .on_enter = [this] { SetStage(AppStage::WaitingForPeer); },
-            });
+  auto ui_username = std::make_shared<std::string>();
+
+  auto input = Input(ui_username.get(), "username",
+                     InputOption{
+                         .transform =
+                             [](InputState s) {
+                               return s.element | bgcolor(Color::Default) |
+                                      color(Color::White);
+                             },
+                         .multiline = false,
+                         .on_change =
+                             [this, ui_username] {
+                               std::lock_guard<std::mutex> lock(state_mutex_);
+                               state_.username = *ui_username;
+                             },
+                         .on_enter =
+                             [this, ui_username] {
+                               {
+                                 std::lock_guard<std::mutex> lock(state_mutex_);
+                                 state_.username = *ui_username;
+                               }
+                               SetStage(AppStage::WaitingForPeer);
+                             },
+                     });
 
   auto container = Container::Vertical({input});
 
