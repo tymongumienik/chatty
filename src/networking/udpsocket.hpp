@@ -14,7 +14,6 @@ class UdpSocket {
   };
 
   UdpSocket(uint16_t port);
-  ~UdpSocket();
 
   void sendPacket(const std::string& ip,
                   std::uint16_t target_port,

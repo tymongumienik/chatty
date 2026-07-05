@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <stdexcept>
+#include "constants.hpp"
 
 Networking::UdpSocket::UdpSocket(std::uint16_t port)
     : port_(port),
@@ -16,6 +17,7 @@ Networking::UdpSocket::UdpSocket(std::uint16_t port)
 
   ::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
   ::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
+  ::setsockopt(fd_.get(), SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
 
   int flags = ::fcntl(fd_, F_GETFL);
   if (::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
@@ -23,10 +25,6 @@ Networking::UdpSocket::UdpSocket(std::uint16_t port)
   }
 
   bind();
-}
-
-Networking::UdpSocket::~UdpSocket() {
-  fd_.release();
 }
 
 void Networking::UdpSocket::sendPacket(const std::string& ip,
@@ -50,7 +48,7 @@ void Networking::UdpSocket::sendPacket(const std::string& ip,
 }
 std::optional<Networking::UdpSocket::Datagram>
 Networking::UdpSocket::receiveRaw() {
-  char buff[1024]{};
+  char buff[Constants::MAX_PACKET_SIZE]{};
 
   sockaddr_in sender{};
   socklen_t senderLen = sizeof(sender);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
+#include <string_view>
 
 namespace Constants {
 
@@ -10,6 +12,7 @@ constexpr std::uint16_t PROTOCOL_VERSION = 1;
 constexpr std::string_view PROTOCOL_VERSION_SV = "1";
 
 constexpr std::size_t MAX_PACKET_SIZE = 4096;  // 4KB
+constexpr std::uint16_t DISCOVERY_PORT = 1337;
 
 constexpr std::array<std::string_view, 6> ASCII_ART = {
     R"(       _           _   _         )",

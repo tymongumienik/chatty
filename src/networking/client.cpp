@@ -1,8 +1,14 @@
 #include "client.hpp"
-#include <cstdlib>
+#include <chrono>
+#include "constants.hpp"
+#include "packets.hpp"
+#include "udpsocket.hpp"
+#include "uniqueid.hpp"
 
 namespace Networking {
-Client::Client(Interop interop) : interop_(std::move(interop)) {}
+Client::Client(Interop interop)
+    : interop_(std::move(interop)), instance_id_(UniqueId::make()) {}
+
 Client::~Client() {
   Stop();
 }
@@ -29,32 +35,83 @@ void Client::SendMessage(std::string text) {
 }
 
 void Client::NetworkLoop(std::stop_token st) {
-  while (!st.stop_requested()) {
-    Command command;
-    bool has_command = false;
+  std::optional<UdpSocket> discovery_socket;
+  auto last_discover_sent = std::chrono::steady_clock::time_point{};
 
+  while (!st.stop_requested()) {
     {
       std::lock_guard lock(commands_mutex_);
-
-      if (!commands_.empty()) {
-        command = std::move(commands_.front());
+      while (!commands_.empty()) {
+        auto command = std::move(commands_.front());
         commands_.pop();
-        has_command = true;
+
+        if (command.type == Command::Type::SearchPeer) {
+          username_ = std::move(command.payload);
+          stage_ = ClientStage::SearchingForPeer;
+
+          if (!discovery_socket) {
+            discovery_socket.emplace(Constants::DISCOVERY_PORT);
+          }
+        }
+
+        if (command.type == Command::Type::SendMessage) {
+          // TODO
+        }
       }
     }
 
-    if (!has_command) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
+    if (stage_ == ClientStage::SearchingForPeer && discovery_socket) {
+      auto now = std::chrono::steady_clock::now();
+
+      if (now - last_discover_sent >= std::chrono::seconds(1)) {
+        DiscoverPacket packet;
+        packet.instanceId = instance_id_;
+        discovery_socket->sendPacket("255.255.255.255",
+                                     Constants::DISCOVERY_PORT, packet);
+        last_discover_sent = now;
+      }
+
+      // listen for incoming packets
+      while (auto datagram = discovery_socket->receiveRaw()) {
+        auto packet = Packet::parse(datagram->data);
+        if (!packet)
+          continue;
+
+        auto transition_to_chat = [&] {
+          peer_address_ = datagram->address;
+          stage_ = ClientStage::Chatting;
+          discovery_socket.reset();
+          interop_.on_peer_found();
+        };
+
+        // another instance is looking for peers - respond with hello
+        if (auto* discover = dynamic_cast<DiscoverPacket*>(packet.get())) {
+          if (discover->instanceId != instance_id_) {
+            HelloPacket hello;
+            hello.instanceId = instance_id_;
+            hello.tcpPort = 0;  // TODO: set actual TCP port
+            discovery_socket->sendPacket(datagram->address,
+                                         Constants::DISCOVERY_PORT, hello);
+            transition_to_chat();
+            break;
+          }
+        }
+
+        // a response to our discover
+        if (auto* hello = dynamic_cast<HelloPacket*>(packet.get())) {
+          if (hello->instanceId != instance_id_) {
+            transition_to_chat();
+            break;
+          }
+        }
+      }
     }
 
-    if (command.type == Command::Type::SearchPeer) {
-      // system("notify-send \"Chatty\" \"Looking for a peer\"");
+    if (stage_ == ClientStage::Chatting) {
+      // TODO
     }
 
-    if (command.type == Command::Type::SendMessage) {
-      // send command.payload
-    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 

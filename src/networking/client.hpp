@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <stop_token>
 #include <string>
@@ -10,6 +11,7 @@
 namespace Networking {
 struct Interop {
   std::function<void()> on_message;
+  std::function<void()> on_peer_found;
 };
 
 struct Command {
@@ -21,6 +23,12 @@ struct Command {
 
   Type type;
   std::string payload;
+};
+
+enum class ClientStage {
+  Idle,
+  SearchingForPeer,
+  Chatting,
 };
 
 class Client {
@@ -42,5 +50,10 @@ class Client {
 
   std::mutex commands_mutex_;
   std::queue<Command> commands_;
+
+  ClientStage stage_ = ClientStage::Idle;
+  std::string username_;
+  std::string instance_id_;
+  std::string peer_address_;
 };
 }  // namespace Networking

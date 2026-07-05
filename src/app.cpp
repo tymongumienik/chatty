@@ -4,9 +4,17 @@
 
 App::App()
     : screen_(ftxui::ScreenInteractive::Fullscreen()),
-      network_({.on_message = [this]() {
-        screen_.PostEvent(ftxui::Event::Custom);
-      }}) {
+      network_(
+          {.on_message = [this]() { screen_.PostEvent(ftxui::Event::Custom); },
+           .on_peer_found =
+               [this]() {
+                 {
+                   std::lock_guard lock(state_mutex_);
+                   state_.stage = AppStage::Chatting;
+                   tab_index_ = static_cast<int>(AppStage::Chatting);
+                 }
+                 screen_.PostEvent(ftxui::Event::Custom);
+               }}) {
   network_.Start();
 }
 
