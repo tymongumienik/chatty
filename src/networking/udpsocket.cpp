@@ -19,8 +19,8 @@ Networking::UdpSocket::UdpSocket(std::uint16_t port)
   ::setsockopt(fd_.get(), SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
   ::setsockopt(fd_.get(), SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
 
-  int flags = ::fcntl(fd_, F_GETFL);
-  if (::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
+  int flags = ::fcntl(fd_.get(), F_GETFL);
+  if (::fcntl(fd_.get(), F_SETFL, flags | O_NONBLOCK) < 0) {
     throw std::runtime_error("UDP set non blocking failed");
   }
 

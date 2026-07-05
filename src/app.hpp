@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <string>
 #include "ftxui/component/component.hpp"
@@ -28,7 +29,7 @@ class App {
  private:
   ftxui::ScreenInteractive screen_;
   AppState state_;
-  int tab_index_ = 0;  // same order as in AppState struct
+  std::atomic<int> tab_index_ = 0;  // same order as in AppState struct
   Networking::Client network_;
   std::mutex state_mutex_;
 

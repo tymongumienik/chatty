@@ -67,7 +67,7 @@ void Client::NetworkLoop(std::stop_token st) {
         DiscoverPacket packet;
         packet.instanceId = instance_id_;
         packet.tcpPort = 0;  // TODO: set actual TCP port
-        discovery_socket->sendPacket("255.255.255.255",
+        discovery_socket->sendPacket(Constants::DISCOVERY_ADDRESS,
                                      Constants::DISCOVERY_PORT, packet);
         last_discover_sent = now;
       }

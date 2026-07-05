@@ -13,6 +13,7 @@ constexpr std::string_view PROTOCOL_VERSION_SV = "2";
 
 constexpr std::size_t MAX_PACKET_SIZE = 4096;  // 4KB
 constexpr std::uint16_t DISCOVERY_PORT = 1337;
+constexpr std::string_view DISCOVERY_ADDRESS = "255.255.255.255";
 
 constexpr std::array<std::string_view, 6> ASCII_ART = {
     R"(       _           _   _         )",

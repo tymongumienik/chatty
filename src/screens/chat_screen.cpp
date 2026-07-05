@@ -77,11 +77,16 @@ ftxui::Component App::MakeChatScreen() {
       Renderer(
           main_container,
           [messages_container, bottom_bar, this] {
+            std::string username{};
+            {
+              std::lock_guard lock(state_mutex_);
+              username = state_.username;
+            }
+
             return vbox({
                 hbox({
                     filler(),
-                    text(std::format("Welcome to Chatty, {}!",
-                                     state_.username)) |
+                    text(std::format("Welcome to Chatty, {}!", username)) |
                         bold,
                     filler(),
                 }),
