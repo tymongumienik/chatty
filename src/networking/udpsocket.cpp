@@ -8,7 +8,7 @@
 Networking::UdpSocket::UdpSocket(std::uint16_t port)
     : port_(port),
       fd_(UniqueFileDescriptor::make(::socket(AF_INET, SOCK_DGRAM, 0))) {
-  if (fd_.get() <= 0)
+  if (fd_.get() < 0)
     throw std::runtime_error("UDP socket() failed");
 
   int yes = 1;

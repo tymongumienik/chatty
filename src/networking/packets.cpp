@@ -10,8 +10,8 @@ std::string Networking::HelloPacket::serialize() const {
 }
 
 std::string Networking::DiscoverPacket::serialize() const {
-  return std::format("{} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
-                     Constants::PROTOCOL_VERSION, instanceId);
+  return std::format("{} {} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
+                     Constants::PROTOCOL_VERSION, tcpPort, instanceId);
 }
 
 namespace {  // scoped
@@ -84,12 +84,18 @@ std::unique_ptr<Networking::Packet> Networking::Packet::parse(
   }
 
   if (breadcrumb == "DISCOVER") {
+    std::string_view portStr = next_token(view);
     std::string_view instanceId = next_token(view);
 
-    if (instanceId.empty() || !view.empty())
+    if (portStr.empty() || instanceId.empty() || !view.empty())
+      return nullptr;
+
+    std::uint16_t tcpPort = 0;
+    if (!safe_to_uint16(portStr, tcpPort))
       return nullptr;
 
     auto packet = std::make_unique<Networking::DiscoverPacket>();
+    packet->tcpPort = tcpPort;
     packet->instanceId = std::string(instanceId);
     return packet;
   }

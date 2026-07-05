@@ -8,8 +8,8 @@ namespace Constants {
 
 constexpr std::string_view APP_NAME = "chattyp2p";  // mustn't include spaces!
 
-constexpr std::uint16_t PROTOCOL_VERSION = 1;
-constexpr std::string_view PROTOCOL_VERSION_SV = "1";
+constexpr std::uint16_t PROTOCOL_VERSION = 2;
+constexpr std::string_view PROTOCOL_VERSION_SV = "2";
 
 constexpr std::size_t MAX_PACKET_SIZE = 4096;  // 4KB
 constexpr std::uint16_t DISCOVERY_PORT = 1337;

@@ -66,6 +66,7 @@ void Client::NetworkLoop(std::stop_token st) {
       if (now - last_discover_sent >= std::chrono::seconds(1)) {
         DiscoverPacket packet;
         packet.instanceId = instance_id_;
+        packet.tcpPort = 0;  // TODO: set actual TCP port
         discovery_socket->sendPacket("255.255.255.255",
                                      Constants::DISCOVERY_PORT, packet);
         last_discover_sent = now;
@@ -78,7 +79,6 @@ void Client::NetworkLoop(std::stop_token st) {
           continue;
 
         auto transition_to_chat = [&] {
-          peer_address_ = datagram->address;
           stage_ = ClientStage::Chatting;
           discovery_socket.reset();
           interop_.on_peer_found();
@@ -92,6 +92,7 @@ void Client::NetworkLoop(std::stop_token st) {
             hello.tcpPort = 0;  // TODO: set actual TCP port
             discovery_socket->sendPacket(datagram->address,
                                          Constants::DISCOVERY_PORT, hello);
+            peer_tcp_port_ = discover->tcpPort;
             transition_to_chat();
             break;
           }
@@ -100,6 +101,7 @@ void Client::NetworkLoop(std::stop_token st) {
         // a response to our discover
         if (auto* hello = dynamic_cast<HelloPacket*>(packet.get())) {
           if (hello->instanceId != instance_id_) {
+            peer_tcp_port_ = hello->tcpPort;
             transition_to_chat();
             break;
           }

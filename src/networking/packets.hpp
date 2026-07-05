@@ -25,6 +25,7 @@ struct HelloPacket : Packet {
 };
 
 struct DiscoverPacket : Packet {
+  std::uint16_t tcpPort{};
   std::string instanceId;
 
   std::string getBreadcrumb() const override { return "DISCOVER"; }

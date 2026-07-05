@@ -54,6 +54,6 @@ class Client {
   ClientStage stage_ = ClientStage::Idle;
   std::string username_;
   std::string instance_id_;
-  std::string peer_address_;
+  std::uint16_t peer_tcp_port_ = 0;
 };
 }  // namespace Networking

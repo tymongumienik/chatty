@@ -19,6 +19,7 @@ App::App()
 }
 
 void App::SetStage(AppStage stage) {
+  std::lock_guard lock(state_mutex_);
   if (stage == AppStage::WaitingForPeer) {
     network_.SearchPeer(state_.username);
   }
