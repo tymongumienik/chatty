@@ -1,11 +1,11 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
+#include <queue>
 #include <stop_token>
 #include <string>
 #include <thread>
-#include <mutex>
-#include <queue>
 
 namespace Networking {
 struct Interop {

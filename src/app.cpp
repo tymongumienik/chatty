@@ -4,8 +4,9 @@
 
 App::App()
     : screen_(ftxui::ScreenInteractive::Fullscreen()),
-      network_(
-          {.on_message = [this]() { screen_.PostEvent(ftxui::Event::Custom); }}) {}
+      network_({.on_message = [this]() {
+        screen_.PostEvent(ftxui::Event::Custom);
+      }}) {}
 
 void App::SetStage(AppStage stage) {
   state_.stage = stage;
