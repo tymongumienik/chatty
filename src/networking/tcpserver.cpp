@@ -62,9 +62,17 @@ std::optional<TcpServer::AcceptResult> TcpServer::Accept() {
 
   int yes = 1;
   // disable Nagle's algorithm for low-latency chat
-  ::setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
+  if (::setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) <
+      0) {
+    ::close(client_fd);
+    return std::nullopt;
+  }
   // enable keepalive to detect dead peers
-  ::setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes));
+  if (::setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) <
+      0) {
+    ::close(client_fd);
+    return std::nullopt;
+  }
 
   char ip[INET_ADDRSTRLEN]{};
   ::inet_ntop(AF_INET, &peer_addr.sin_addr, ip, sizeof(ip));
@@ -76,7 +84,7 @@ std::optional<TcpServer::AcceptResult> TcpServer::Accept() {
 }
 
 void TcpServer::Close() {
-  fd_.reset();
+  fd_.reset(-1);
 }
 
 void TcpServer::BindAndListen() {

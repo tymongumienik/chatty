@@ -166,6 +166,7 @@ RecvResult TcpSocket::ReceiveRaw() {
     std::uint32_t msg_len = ntohl(net_len);
 
     if (msg_len > Constants::MAX_MESSAGE_SIZE) {
+      recv_buffer_.clear();
       return {RecvStatus::Error, {}};
     }
 
@@ -204,6 +205,7 @@ RecvResult TcpSocket::ReceiveRaw() {
   std::uint32_t msg_len = ntohl(net_len);
 
   if (msg_len > Constants::MAX_MESSAGE_SIZE) {
+    recv_buffer_.clear();
     return {RecvStatus::Error, {}};
   }
 
@@ -221,7 +223,7 @@ RecvResult TcpSocket::ReceiveRaw() {
 }
 
 void TcpSocket::Close() {
-  fd_.reset();
+  fd_.reset(-1);
   recv_buffer_.clear();
 }
 
