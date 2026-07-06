@@ -26,6 +26,15 @@ Chatty utilizes a two stage networking model, based on standard Unix C networkin
 *   A compiler with **C++23** support (tested on g++ 16.1.1 , clang++ 22.1.6)
 *   **CMake** (3.25+)
 
+### Getting the Source
+```bash
+git clone --recurse-submodules https://github.com/tymongumienik/chatty.git
+```
+Or if you've already cloned without submodules:
+```bash
+git submodule update --init --recursive
+```
+
 ### Debug Build
 A script is provided to quickly build the project:
 ```bash
