@@ -110,7 +110,8 @@ void test_tcp_bidirectional() {
   TcpServer server(0);
 
   TcpSocket client;
-  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  [[maybe_unused]] bool connected =
+      client.Connect("127.0.0.1", server.GetPort());
   assert(connected);
 
   auto accepted = poll_accept(server);
@@ -135,7 +136,8 @@ void test_tcp_multiple_messages() {
   TcpServer server(0);
 
   TcpSocket client;
-  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  [[maybe_unused]] bool connected =
+      client.Connect("127.0.0.1", server.GetPort());
   assert(connected);
 
   auto accepted = poll_accept(server);
@@ -158,7 +160,8 @@ void test_tcp_close_detection() {
   TcpServer server(0);
 
   TcpSocket client;
-  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  [[maybe_unused]] bool connected =
+      client.Connect("127.0.0.1", server.GetPort());
   assert(connected);
 
   auto accepted = poll_accept(server);
@@ -193,7 +196,8 @@ void test_tcp_server_accept_result_has_peer_address() {
   TcpServer server(0);
 
   TcpSocket client;
-  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  [[maybe_unused]] bool connected =
+      client.Connect("127.0.0.1", server.GetPort());
   assert(connected);
 
   auto accepted = poll_accept(server);
