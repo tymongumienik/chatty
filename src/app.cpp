@@ -4,17 +4,30 @@
 
 App::App()
     : screen_(ftxui::ScreenInteractive::Fullscreen()),
-      network_(
-          {.on_message = [this]() { screen_.PostEvent(ftxui::Event::Custom); },
-           .on_peer_found =
-               [this]() {
-                 {
-                   std::lock_guard lock(state_mutex_);
-                   state_.stage = AppStage::Chatting;
-                   tab_index_ = static_cast<int>(AppStage::Chatting);
-                 }
-                 screen_.PostEvent(ftxui::Event::Custom);
-               }}) {
+      network_({.on_message =
+                    [this](std::string text) {
+                      std::lock_guard lock(state_mutex_);
+
+                      state_.messages.push_back({
+                          .sender = state_.peer_username,
+                          .text = std::move(text),
+                          .mine = false,
+                      });
+
+                      screen_.PostEvent(ftxui::Event::Custom);
+                    },
+                .on_peer_found =
+                    [this](std::string peer_username) {
+                      {
+                        std::lock_guard lock(state_mutex_);
+                        state_.peer_username = std::move(peer_username);
+                        state_.stage = AppStage::Chatting;
+                        tab_index_ = static_cast<int>(AppStage::Chatting);
+                      }
+                      screen_.PostEvent(ftxui::Event::Custom);
+                    },
+                .on_peer_disconnected =
+                    [this]() { ResetAfterPeerDisconnected(); }}) {
   network_.Start();
 }
 
@@ -25,6 +38,18 @@ void App::SetStage(AppStage stage) {
   }
   state_.stage = stage;
   tab_index_ = static_cast<int>(stage);
+}
+
+void App::ResetAfterPeerDisconnected() {
+  {
+    std::lock_guard lock(state_mutex_);
+    state_.messages.clear();
+    state_.peer_username.clear();
+    state_.stage = AppStage::NameInput;
+    tab_index_ = static_cast<int>(AppStage::NameInput);
+  }
+
+  screen_.PostEvent(ftxui::Event::Custom);
 }
 
 void App::Run() {

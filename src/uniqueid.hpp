@@ -1,11 +1,10 @@
 #pragma once
 
-#include <random>
+#include <cstddef>
+#include <string>
 
 namespace UniqueId {
-constexpr size_t length = 64;
-inline thread_local std::mt19937 generator(std::random_device{}());
-constexpr char chars[] = "0123456789abcdef";
+constexpr std::size_t length = 64;
 
 std::string make();
 }  // namespace UniqueId

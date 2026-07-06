@@ -61,7 +61,20 @@ ftxui::Component App::MakeChatScreen() {
     if (input_text->empty())
       return;
 
-    // TODO
+    std::string username{};
+    {
+      std::lock_guard lock(state_mutex_);
+      username = state_.username;
+    }
+
+    auto msg = Message{.sender = username, .text = *input_text, .mine = true};
+    network_.SendMessage(msg.text);
+
+    {
+      std::lock_guard lock(state_mutex_);
+      state_.messages.push_back(msg);
+    }
+    append_message_to_ui(msg);
 
     input_text->clear();
   };
@@ -78,16 +91,38 @@ ftxui::Component App::MakeChatScreen() {
           main_container,
           [messages_container, bottom_bar, this] {
             std::string username{};
+            std::string peer_username{};
             {
               std::lock_guard lock(state_mutex_);
               username = state_.username;
+              peer_username = state_.peer_username;
             }
+
+            std::string role_str = "Unknown";
+            auto role = network_.GetRole();
+            if (role == Networking::ClientRole::Hosting) {
+              role_str = "Host";
+            } else if (role == Networking::ClientRole::Connecting) {
+              role_str = "Client";
+            }
+
+            std::string peer_label =
+                peer_username.empty() ? network_.GetPeerIp() : peer_username;
+
+            std::string connection_info =
+                std::format("Chatting with {} ({}:{} as {})", peer_label,
+                            network_.GetPeerIp(), network_.GetPort(), role_str);
 
             return vbox({
                 hbox({
                     filler(),
                     text(std::format("Welcome to Chatty, {}!", username)) |
                         bold,
+                    filler(),
+                }),
+                hbox({
+                    filler(),
+                    text(connection_info) | dim | color(Color::Green),
                     filler(),
                 }),
                 separator(),
@@ -104,6 +139,10 @@ ftxui::Component App::MakeChatScreen() {
 
         if (event == Event::Custom) {
           std::lock_guard lock(state_mutex_);
+
+          if (messages_container->ChildCount() > state_.messages.size()) {
+            messages_container->DetachAllChildren();
+          }
 
           while (messages_container->ChildCount() < state_.messages.size()) {
             size_t index = messages_container->ChildCount();

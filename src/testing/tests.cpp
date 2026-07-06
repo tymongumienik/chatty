@@ -1,7 +1,44 @@
 #include <fcntl.h>
 #include <atomic>
 #include <cassert>
+#include <chrono>
+#include <print>
+#include <string_view>
+#include <thread>
+#include <unordered_map>
 #include "networking/filedescriptor.hpp"
+#include "networking/packets.hpp"
+#include "networking/tcpserver.hpp"
+#include "networking/tcpsocket.hpp"
+#include "uniqueid.hpp"
+
+// ─── helpers ───────────────────────────────────────────────────────────
+
+static Networking::RecvResult poll_recv(Networking::TcpSocket& sock,
+                                        int max_tries = 100) {
+  Networking::RecvResult r{Networking::RecvStatus::WouldBlock, {}};
+  for (int i = 0; i < max_tries; ++i) {
+    r = sock.receiveRaw();
+    if (r.status == Networking::RecvStatus::Data)
+      break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return r;
+}
+
+static std::optional<Networking::TcpServer::AcceptResult> poll_accept(
+    Networking::TcpServer& server,
+    int max_tries = 100) {
+  for (int i = 0; i < max_tries; ++i) {
+    auto accepted = server.accept();
+    if (accepted)
+      return accepted;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return std::nullopt;
+}
+
+// ─── file descriptor tests ────────────────────────────────────────────
 
 void test_move_file_descriptor() {
   int devnull = open("/dev/null", O_RDONLY);
@@ -29,6 +66,369 @@ void test_move_file_descriptor() {
          1);  // because we moved a to b, only b has rights to call the deleter
 }
 
-int main() {
-  test_move_file_descriptor();
+void test_fd_default_deleter_closes() {
+  int fd = open("/dev/null", O_RDONLY);
+  assert(fd >= 0);
+
+  {
+    auto resource = UniqueFileDescriptor::make(fd);
+  }  // should close fd
+
+  // writing to a closed fd should fail
+  char c = 0;
+  ssize_t n = ::read(fd, &c, 1);
+  assert(n < 0);  // EBADF
+}
+
+// ─── tcp server/client tests ──────────────────────────────────────────
+
+void test_tcp_server_client() {
+  using namespace Networking;
+
+  TcpServer server(0);
+  std::uint16_t port = server.getPort();
+  assert(port > 0);
+
+  std::string local_ip = "127.0.0.1";
+
+  TcpSocket client;
+  bool connected = client.connect(local_ip, port);
+  assert(connected);
+
+  auto accepted = poll_accept(server);
+  assert(accepted.has_value());
+  assert(accepted->socket.isValid());
+
+  client.sendRaw("hello from client");
+
+  auto received = poll_recv(accepted->socket);
+  assert(received.status == RecvStatus::Data);
+  assert(received.data == "hello from client");
+}
+
+void test_tcp_bidirectional() {
+  using namespace Networking;
+
+  TcpServer server(0);
+
+  TcpSocket client;
+  assert(client.connect("127.0.0.1", server.getPort()));
+
+  auto accepted = poll_accept(server);
+  assert(accepted.has_value());
+
+  // client → server
+  client.sendRaw("ping");
+  auto r1 = poll_recv(accepted->socket);
+  assert(r1.status == RecvStatus::Data);
+  assert(r1.data == "ping");
+
+  // server → client
+  accepted->socket.sendRaw("pong");
+  auto r2 = poll_recv(client);
+  assert(r2.status == RecvStatus::Data);
+  assert(r2.data == "pong");
+}
+
+void test_tcp_multiple_messages() {
+  using namespace Networking;
+
+  TcpServer server(0);
+
+  TcpSocket client;
+  assert(client.connect("127.0.0.1", server.getPort()));
+
+  auto accepted = poll_accept(server);
+  assert(accepted.has_value());
+
+  // send several messages in sequence
+  for (int i = 0; i < 5; ++i) {
+    std::string msg = "message_" + std::to_string(i);
+    client.sendRaw(msg);
+
+    auto r = poll_recv(accepted->socket);
+    assert(r.status == RecvStatus::Data);
+    assert(r.data == msg);
+  }
+}
+
+void test_tcp_close_detection() {
+  using namespace Networking;
+
+  TcpServer server(0);
+
+  TcpSocket client;
+  assert(client.connect("127.0.0.1", server.getPort()));
+
+  auto accepted = poll_accept(server);
+  assert(accepted.has_value());
+
+  // close the client side
+  client.close();
+
+  // server should eventually see Closed
+  RecvResult r{RecvStatus::WouldBlock, {}};
+  for (int i = 0; i < 100; ++i) {
+    r = accepted->socket.receiveRaw();
+    if (r.status == RecvStatus::Closed)
+      break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  assert(r.status == RecvStatus::Closed);
+}
+
+void test_tcp_connect_bad_port() {
+  using namespace Networking;
+
+  TcpSocket client;
+  // port 1 is almost certainly not listening
+  bool connected = client.connect("127.0.0.1", 1);
+  assert(!connected);
+}
+
+void test_tcp_server_accept_result_has_peer_address() {
+  using namespace Networking;
+
+  TcpServer server(0);
+
+  TcpSocket client;
+  assert(client.connect("127.0.0.1", server.getPort()));
+
+  auto accepted = poll_accept(server);
+  assert(accepted.has_value());
+  assert(accepted->peer_address == "127.0.0.1");
+}
+
+// ─── packet tests ─────────────────────────────────────────────────────
+
+void test_hello_packet_roundtrip() {
+  using namespace Networking;
+
+  HelloPacket original;
+  original.tcpPort = 12345;
+  original.instanceId = "abc123";
+  original.username = "alice";
+
+  std::string wire = original.serialize();
+  auto parsed = Packet::parse(wire);
+  assert(parsed != nullptr);
+
+  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  assert(hello != nullptr);
+  assert(hello->tcpPort == 12345);
+  assert(hello->instanceId == "abc123");
+  assert(hello->username == "alice");
+  assert(hello->getBreadcrumb() == "HELLO");
+}
+
+void test_discover_packet_roundtrip() {
+  using namespace Networking;
+
+  DiscoverPacket original;
+  original.tcpPort = 0;
+  original.instanceId = "def456";
+  original.username = "bob";
+
+  std::string wire = original.serialize();
+  auto parsed = Packet::parse(wire);
+  assert(parsed != nullptr);
+
+  auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
+  assert(discover != nullptr);
+  assert(discover->tcpPort == 0);
+  assert(discover->instanceId == "def456");
+  assert(discover->username == "bob");
+  assert(discover->getBreadcrumb() == "DISCOVER");
+}
+
+void test_packet_username_with_spaces() {
+  using namespace Networking;
+
+  HelloPacket original;
+  original.tcpPort = 8080;
+  original.instanceId = "id99";
+  original.username = "John Doe The Third";
+
+  std::string wire = original.serialize();
+  auto parsed = Packet::parse(wire);
+  assert(parsed != nullptr);
+
+  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  assert(hello != nullptr);
+  assert(hello->username == "John Doe The Third");
+}
+
+void test_packet_empty_username() {
+  using namespace Networking;
+
+  DiscoverPacket original;
+  original.tcpPort = 5555;
+  original.instanceId = "xyz";
+  original.username = "";
+
+  std::string wire = original.serialize();
+  auto parsed = Packet::parse(wire);
+  assert(parsed != nullptr);
+
+  auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
+  assert(discover != nullptr);
+  assert(discover->username.empty());
+}
+
+void test_packet_parse_rejects_empty() {
+  auto parsed = Networking::Packet::parse("");
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_garbage() {
+  auto parsed = Networking::Packet::parse("not a real packet at all");
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_wrong_app() {
+  std::string bad = "HELLO wrongapp 3 1234 someid alice";
+  auto parsed = Networking::Packet::parse(bad);
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_wrong_version() {
+  auto bad = std::format("HELLO {} 999 1234 someid alice", Constants::APP_NAME);
+  auto parsed = Networking::Packet::parse(bad);
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_unknown_breadcrumb() {
+  auto bad = std::format("FOOBAR {} {} 1234 someid alice", Constants::APP_NAME,
+                         Constants::PROTOCOL_VERSION);
+  auto parsed = Networking::Packet::parse(bad);
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_missing_fields() {
+  // just breadcrumb + app + version, no port or instanceId
+  auto bad = std::format("HELLO {} {}", Constants::APP_NAME,
+                         Constants::PROTOCOL_VERSION);
+  auto parsed = Networking::Packet::parse(bad);
+  assert(parsed == nullptr);
+}
+
+void test_packet_parse_rejects_oversized() {
+  std::string big(Constants::MAX_PACKET_SIZE + 1, 'X');
+  auto parsed = Networking::Packet::parse(big);
+  assert(parsed == nullptr);
+}
+
+void test_packet_port_zero() {
+  using namespace Networking;
+
+  HelloPacket p;
+  p.tcpPort = 0;
+  p.instanceId = "host_me";
+  p.username = "tester";
+
+  auto parsed = Packet::parse(p.serialize());
+  assert(parsed != nullptr);
+
+  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  assert(hello != nullptr);
+  assert(hello->tcpPort == 0);
+}
+
+void test_packet_max_port() {
+  using namespace Networking;
+
+  DiscoverPacket p;
+  p.tcpPort = 65535;
+  p.instanceId = "edge";
+  p.username = "max";
+
+  auto parsed = Packet::parse(p.serialize());
+  assert(parsed != nullptr);
+
+  auto* disc = dynamic_cast<DiscoverPacket*>(parsed.get());
+  assert(disc != nullptr);
+  assert(disc->tcpPort == 65535);
+}
+
+// ─── unique id tests ──────────────────────────────────────────────────
+
+void test_unique_id_length() {
+  auto id = UniqueId::make();
+  assert(id.size() == UniqueId::length);
+}
+
+void test_unique_id_hex_chars() {
+  auto id = UniqueId::make();
+  for (char c : id) {
+    assert((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+  }
+}
+
+// ─── main ─────────────────────────────────────────────────────────────
+
+int main(int argc, char* argv[]) {
+  std::unordered_map<std::string, void (*)()> tests = {
+      // unique file descriptor
+      {"test_move_file_descriptor", test_move_file_descriptor},
+      {"test_fd_default_deleter_closes", test_fd_default_deleter_closes},
+      // tcp
+      {"test_tcp_server_client", test_tcp_server_client},
+      {"test_tcp_bidirectional", test_tcp_bidirectional},
+      {"test_tcp_multiple_messages", test_tcp_multiple_messages},
+      {"test_tcp_close_detection", test_tcp_close_detection},
+      {"test_tcp_connect_bad_port", test_tcp_connect_bad_port},
+      {"test_tcp_server_accept_result_has_peer_address",
+       test_tcp_server_accept_result_has_peer_address},
+      // packets
+      {"test_hello_packet_roundtrip", test_hello_packet_roundtrip},
+      {"test_discover_packet_roundtrip", test_discover_packet_roundtrip},
+      {"test_packet_username_with_spaces", test_packet_username_with_spaces},
+      {"test_packet_empty_username", test_packet_empty_username},
+      {"test_packet_parse_rejects_empty", test_packet_parse_rejects_empty},
+      {"test_packet_parse_rejects_garbage", test_packet_parse_rejects_garbage},
+      {"test_packet_parse_rejects_wrong_app",
+       test_packet_parse_rejects_wrong_app},
+      {"test_packet_parse_rejects_wrong_version",
+       test_packet_parse_rejects_wrong_version},
+      {"test_packet_parse_rejects_unknown_breadcrumb",
+       test_packet_parse_rejects_unknown_breadcrumb},
+      {"test_packet_parse_rejects_missing_fields",
+       test_packet_parse_rejects_missing_fields},
+      {"test_packet_parse_rejects_oversized",
+       test_packet_parse_rejects_oversized},
+      {"test_packet_port_zero", test_packet_port_zero},
+      {"test_packet_max_port", test_packet_max_port},
+      // unique id
+      {"test_unique_id_length", test_unique_id_length},
+      {"test_unique_id_hex_chars", test_unique_id_hex_chars},
+  };
+
+  if (argc == 2 && std::string_view(argv[1]) == "--list") {
+    for (auto& [name, fn] : tests) {
+      std::println("{}", name);
+    }
+    return 0;
+  }
+
+  if (argc == 2) {
+    auto it = tests.find(argv[1]);
+    if (it == tests.end()) {
+      std::println(stderr, "Unknown test: {}", argv[1]);
+      return 1;
+    }
+    it->second();
+    return 0;
+  }
+
+  int failed = 0;
+
+  for (auto& [name, fn] : tests) {
+    try {
+      fn();
+    } catch (...) {
+      ++failed;
+    }
+  }
+
+  return failed > 0;
 }

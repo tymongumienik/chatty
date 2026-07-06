@@ -18,6 +18,7 @@ struct AppState {
   AppStage stage = AppStage::NameInput;
 
   std::string username;
+  std::string peer_username;
   std::vector<Message> messages{};
 };
 
@@ -38,4 +39,5 @@ class App {
   ftxui::Component MakeChatScreen();
 
   void SetStage(AppStage stage);
+  void ResetAfterPeerDisconnected();
 };
