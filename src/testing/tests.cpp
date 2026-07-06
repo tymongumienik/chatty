@@ -74,7 +74,7 @@ void test_fd_default_deleter_closes() {
   }  // should close fd
 
   // checking a closed fd should fail with EBADF
-  int res = ::fcntl(fd, F_GETFD);
+  [[maybe_unused]] int res = ::fcntl(fd, F_GETFD);
   assert(res < 0 && errno == EBADF);
 }
 
@@ -90,7 +90,7 @@ void test_tcp_server_client() {
   std::string local_ip = "127.0.0.1";
 
   TcpSocket client;
-  bool connected = client.Connect(local_ip, port);
+  [[maybe_unused]] bool connected = client.Connect(local_ip, port);
   assert(connected);
 
   auto accepted = poll_accept(server);
@@ -110,7 +110,8 @@ void test_tcp_bidirectional() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.Connect("127.0.0.1", server.GetPort()));
+  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  assert(connected);
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -134,7 +135,8 @@ void test_tcp_multiple_messages() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.Connect("127.0.0.1", server.GetPort()));
+  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  assert(connected);
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -156,7 +158,8 @@ void test_tcp_close_detection() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.Connect("127.0.0.1", server.GetPort()));
+  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  assert(connected);
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -180,7 +183,7 @@ void test_tcp_connect_bad_port() {
 
   TcpSocket client;
   // port 1 is almost certainly not listening
-  bool connected = client.Connect("127.0.0.1", 1);
+  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", 1);
   assert(!connected);
 }
 
@@ -190,7 +193,8 @@ void test_tcp_server_accept_result_has_peer_address() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.Connect("127.0.0.1", server.GetPort()));
+  [[maybe_unused]] bool connected = client.Connect("127.0.0.1", server.GetPort());
+  assert(connected);
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -211,7 +215,7 @@ void test_hello_packet_roundtrip() {
   auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
-  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  [[maybe_unused]] auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
   assert(hello != nullptr);
   assert(hello->tcp_port == 12345);
   assert(hello->instance_id == "abc123");
@@ -231,7 +235,7 @@ void test_discover_packet_roundtrip() {
   auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
-  auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
+  [[maybe_unused]] auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
   assert(discover != nullptr);
   assert(discover->tcp_port == 0);
   assert(discover->instance_id == "def456");
@@ -251,7 +255,7 @@ void test_packet_username_with_spaces() {
   auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
-  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  [[maybe_unused]] auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
   assert(hello != nullptr);
   assert(hello->username == "John Doe The Third");
 }
@@ -268,7 +272,7 @@ void test_packet_empty_username() {
   auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
-  auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
+  [[maybe_unused]] auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
   assert(discover != nullptr);
   assert(discover->username.empty());
 }
@@ -327,7 +331,7 @@ void test_packet_port_zero() {
   auto parsed = Packet::Parse(p.Serialize());
   assert(parsed != nullptr);
 
-  auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
+  [[maybe_unused]] auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
   assert(hello != nullptr);
   assert(hello->tcp_port == 0);
 }
@@ -343,7 +347,7 @@ void test_packet_max_port() {
   auto parsed = Packet::Parse(p.Serialize());
   assert(parsed != nullptr);
 
-  auto* disc = dynamic_cast<DiscoverPacket*>(parsed.get());
+  [[maybe_unused]] auto* disc = dynamic_cast<DiscoverPacket*>(parsed.get());
   assert(disc != nullptr);
   assert(disc->tcp_port == 65535);
 }
@@ -358,6 +362,7 @@ void test_unique_id_length() {
 void test_unique_id_hex_chars() {
   auto id = UniqueId::make();
   for (char c : id) {
+    (void)c;
     assert((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
   }
 }
