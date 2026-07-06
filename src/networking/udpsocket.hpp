@@ -15,13 +15,13 @@ class UdpSocket {
 
   UdpSocket(uint16_t port);
 
-  void sendPacket(const std::string& ip,
+  void SendPacket(const std::string& ip,
                   std::uint16_t target_port,
                   const Networking::Packet& packet);
-  std::optional<Datagram> receiveRaw();
+  std::optional<Datagram> ReceiveRaw();
 
  private:
-  void bind();
+  void Bind();
   std::uint16_t port_;
   UniqueFileDescriptor::Type fd_;
 };

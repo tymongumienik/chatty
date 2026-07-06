@@ -18,7 +18,7 @@ static Networking::RecvResult poll_recv(Networking::TcpSocket& sock,
                                         int max_tries = 100) {
   Networking::RecvResult r{Networking::RecvStatus::WouldBlock, {}};
   for (int i = 0; i < max_tries; ++i) {
-    r = sock.receiveRaw();
+    r = sock.ReceiveRaw();
     if (r.status == Networking::RecvStatus::Data)
       break;
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -30,7 +30,7 @@ static std::optional<Networking::TcpServer::AcceptResult> poll_accept(
     Networking::TcpServer& server,
     int max_tries = 100) {
   for (int i = 0; i < max_tries; ++i) {
-    auto accepted = server.accept();
+    auto accepted = server.Accept();
     if (accepted)
       return accepted;
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -85,20 +85,20 @@ void test_tcp_server_client() {
   using namespace Networking;
 
   TcpServer server(0);
-  std::uint16_t port = server.getPort();
+  std::uint16_t port = server.GetPort();
   assert(port > 0);
 
   std::string local_ip = "127.0.0.1";
 
   TcpSocket client;
-  bool connected = client.connect(local_ip, port);
+  bool connected = client.Connect(local_ip, port);
   assert(connected);
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
-  assert(accepted->socket.isValid());
+  assert(accepted->socket.IsValid());
 
-  client.sendRaw("hello from client");
+  client.SendRaw("hello from client");
 
   auto received = poll_recv(accepted->socket);
   assert(received.status == RecvStatus::Data);
@@ -111,19 +111,19 @@ void test_tcp_bidirectional() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.connect("127.0.0.1", server.getPort()));
+  assert(client.Connect("127.0.0.1", server.GetPort()));
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
 
   // client → server
-  client.sendRaw("ping");
+  client.SendRaw("ping");
   auto r1 = poll_recv(accepted->socket);
   assert(r1.status == RecvStatus::Data);
   assert(r1.data == "ping");
 
   // server → client
-  accepted->socket.sendRaw("pong");
+  accepted->socket.SendRaw("pong");
   auto r2 = poll_recv(client);
   assert(r2.status == RecvStatus::Data);
   assert(r2.data == "pong");
@@ -135,7 +135,7 @@ void test_tcp_multiple_messages() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.connect("127.0.0.1", server.getPort()));
+  assert(client.Connect("127.0.0.1", server.GetPort()));
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -143,7 +143,7 @@ void test_tcp_multiple_messages() {
   // send several messages in sequence
   for (int i = 0; i < 5; ++i) {
     std::string msg = "message_" + std::to_string(i);
-    client.sendRaw(msg);
+    client.SendRaw(msg);
 
     auto r = poll_recv(accepted->socket);
     assert(r.status == RecvStatus::Data);
@@ -157,18 +157,18 @@ void test_tcp_close_detection() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.connect("127.0.0.1", server.getPort()));
+  assert(client.Connect("127.0.0.1", server.GetPort()));
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
 
   // close the client side
-  client.close();
+  client.Close();
 
   // server should eventually see Closed
   RecvResult r{RecvStatus::WouldBlock, {}};
   for (int i = 0; i < 100; ++i) {
-    r = accepted->socket.receiveRaw();
+    r = accepted->socket.ReceiveRaw();
     if (r.status == RecvStatus::Closed)
       break;
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -181,7 +181,7 @@ void test_tcp_connect_bad_port() {
 
   TcpSocket client;
   // port 1 is almost certainly not listening
-  bool connected = client.connect("127.0.0.1", 1);
+  bool connected = client.Connect("127.0.0.1", 1);
   assert(!connected);
 }
 
@@ -191,7 +191,7 @@ void test_tcp_server_accept_result_has_peer_address() {
   TcpServer server(0);
 
   TcpSocket client;
-  assert(client.connect("127.0.0.1", server.getPort()));
+  assert(client.Connect("127.0.0.1", server.GetPort()));
 
   auto accepted = poll_accept(server);
   assert(accepted.has_value());
@@ -204,52 +204,52 @@ void test_hello_packet_roundtrip() {
   using namespace Networking;
 
   HelloPacket original;
-  original.tcpPort = 12345;
-  original.instanceId = "abc123";
+  original.tcp_port = 12345;
+  original.instance_id = "abc123";
   original.username = "alice";
 
-  std::string wire = original.serialize();
-  auto parsed = Packet::parse(wire);
+  std::string wire = original.Serialize();
+  auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
   auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
   assert(hello != nullptr);
-  assert(hello->tcpPort == 12345);
-  assert(hello->instanceId == "abc123");
+  assert(hello->tcp_port == 12345);
+  assert(hello->instance_id == "abc123");
   assert(hello->username == "alice");
-  assert(hello->getBreadcrumb() == "HELLO");
+  assert(hello->GetBreadcrumb() == "HELLO");
 }
 
 void test_discover_packet_roundtrip() {
   using namespace Networking;
 
   DiscoverPacket original;
-  original.tcpPort = 0;
-  original.instanceId = "def456";
+  original.tcp_port = 0;
+  original.instance_id = "def456";
   original.username = "bob";
 
-  std::string wire = original.serialize();
-  auto parsed = Packet::parse(wire);
+  std::string wire = original.Serialize();
+  auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
   auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
   assert(discover != nullptr);
-  assert(discover->tcpPort == 0);
-  assert(discover->instanceId == "def456");
+  assert(discover->tcp_port == 0);
+  assert(discover->instance_id == "def456");
   assert(discover->username == "bob");
-  assert(discover->getBreadcrumb() == "DISCOVER");
+  assert(discover->GetBreadcrumb() == "DISCOVER");
 }
 
 void test_packet_username_with_spaces() {
   using namespace Networking;
 
   HelloPacket original;
-  original.tcpPort = 8080;
-  original.instanceId = "id99";
+  original.tcp_port = 8080;
+  original.instance_id = "id99";
   original.username = "John Doe The Third";
 
-  std::string wire = original.serialize();
-  auto parsed = Packet::parse(wire);
+  std::string wire = original.Serialize();
+  auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
   auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
@@ -261,12 +261,12 @@ void test_packet_empty_username() {
   using namespace Networking;
 
   DiscoverPacket original;
-  original.tcpPort = 5555;
-  original.instanceId = "xyz";
+  original.tcp_port = 5555;
+  original.instance_id = "xyz";
   original.username = "";
 
-  std::string wire = original.serialize();
-  auto parsed = Packet::parse(wire);
+  std::string wire = original.Serialize();
+  auto parsed = Packet::Parse(wire);
   assert(parsed != nullptr);
 
   auto* discover = dynamic_cast<DiscoverPacket*>(parsed.get());
@@ -275,45 +275,45 @@ void test_packet_empty_username() {
 }
 
 void test_packet_parse_rejects_empty() {
-  auto parsed = Networking::Packet::parse("");
+  auto parsed = Networking::Packet::Parse("");
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_garbage() {
-  auto parsed = Networking::Packet::parse("not a real packet at all");
+  auto parsed = Networking::Packet::Parse("not a real packet at all");
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_wrong_app() {
   std::string bad = "HELLO wrongapp 3 1234 someid alice";
-  auto parsed = Networking::Packet::parse(bad);
+  auto parsed = Networking::Packet::Parse(bad);
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_wrong_version() {
   auto bad = std::format("HELLO {} 999 1234 someid alice", Constants::APP_NAME);
-  auto parsed = Networking::Packet::parse(bad);
+  auto parsed = Networking::Packet::Parse(bad);
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_unknown_breadcrumb() {
   auto bad = std::format("FOOBAR {} {} 1234 someid alice", Constants::APP_NAME,
                          Constants::PROTOCOL_VERSION);
-  auto parsed = Networking::Packet::parse(bad);
+  auto parsed = Networking::Packet::Parse(bad);
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_missing_fields() {
-  // just breadcrumb + app + version, no port or instanceId
+  // just breadcrumb + app + version, no port or instance_id
   auto bad = std::format("HELLO {} {}", Constants::APP_NAME,
                          Constants::PROTOCOL_VERSION);
-  auto parsed = Networking::Packet::parse(bad);
+  auto parsed = Networking::Packet::Parse(bad);
   assert(parsed == nullptr);
 }
 
 void test_packet_parse_rejects_oversized() {
   std::string big(Constants::MAX_PACKET_SIZE + 1, 'X');
-  auto parsed = Networking::Packet::parse(big);
+  auto parsed = Networking::Packet::Parse(big);
   assert(parsed == nullptr);
 }
 
@@ -321,32 +321,32 @@ void test_packet_port_zero() {
   using namespace Networking;
 
   HelloPacket p;
-  p.tcpPort = 0;
-  p.instanceId = "host_me";
+  p.tcp_port = 0;
+  p.instance_id = "host_me";
   p.username = "tester";
 
-  auto parsed = Packet::parse(p.serialize());
+  auto parsed = Packet::Parse(p.Serialize());
   assert(parsed != nullptr);
 
   auto* hello = dynamic_cast<HelloPacket*>(parsed.get());
   assert(hello != nullptr);
-  assert(hello->tcpPort == 0);
+  assert(hello->tcp_port == 0);
 }
 
 void test_packet_max_port() {
   using namespace Networking;
 
   DiscoverPacket p;
-  p.tcpPort = 65535;
-  p.instanceId = "edge";
+  p.tcp_port = 65535;
+  p.instance_id = "edge";
   p.username = "max";
 
-  auto parsed = Packet::parse(p.serialize());
+  auto parsed = Packet::Parse(p.Serialize());
   assert(parsed != nullptr);
 
   auto* disc = dynamic_cast<DiscoverPacket*>(parsed.get());
   assert(disc != nullptr);
-  assert(disc->tcpPort == 65535);
+  assert(disc->tcp_port == 65535);
 }
 
 // ─── unique id tests ──────────────────────────────────────────────────

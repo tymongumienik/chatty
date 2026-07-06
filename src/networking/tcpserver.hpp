@@ -16,16 +16,16 @@ class TcpServer {
     std::string peer_address;
   };
 
-  std::optional<AcceptResult> accept();
+  std::optional<AcceptResult> Accept();
 
-  void close();
+  void Close();
 
-  bool isValid() const { return fd_.get() >= 0; }
+  bool IsValid() const { return fd_.get() >= 0; }
 
-  std::uint16_t getPort() const { return port_; }
+  std::uint16_t GetPort() const { return port_; }
 
  private:
-  void bindAndListen();
+  void BindAndListen();
 
   std::uint16_t port_;
   UniqueFileDescriptor::Type fd_;

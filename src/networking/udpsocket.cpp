@@ -28,13 +28,13 @@ Networking::UdpSocket::UdpSocket(std::uint16_t port)
     throw std::runtime_error("UDP set non blocking failed");
   }
 
-  bind();
+  Bind();
 }
 
-void Networking::UdpSocket::sendPacket(const std::string& ip,
+void Networking::UdpSocket::SendPacket(const std::string& ip,
                                        uint16_t target_port,
                                        const Networking::Packet& packet) {
-  std::string serialized = packet.serialize();
+  std::string serialized = packet.Serialize();
 
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
@@ -56,7 +56,7 @@ void Networking::UdpSocket::sendPacket(const std::string& ip,
   }
 }
 std::optional<Networking::UdpSocket::Datagram>
-Networking::UdpSocket::receiveRaw() {
+Networking::UdpSocket::ReceiveRaw() {
   char buff[Constants::MAX_PACKET_SIZE]{};
 
   sockaddr_in sender{};
@@ -85,7 +85,7 @@ Networking::UdpSocket::receiveRaw() {
   };
 }
 
-void Networking::UdpSocket::bind() {
+void Networking::UdpSocket::Bind() {
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);

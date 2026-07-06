@@ -23,12 +23,12 @@ class TcpSocket {
   TcpSocket() : fd_(UniqueFileDescriptor::make(-1)) {}
   explicit TcpSocket(UniqueFileDescriptor::Type fd);
 
-  bool connect(const std::string& ip, std::uint16_t port);
-  void sendRaw(const std::string& data);
-  RecvResult receiveRaw();
+  bool Connect(const std::string& ip, std::uint16_t port);
+  void SendRaw(const std::string& data);
+  RecvResult ReceiveRaw();
 
-  void close();
-  bool isValid() const { return fd_.get() >= 0; }
+  void Close();
+  bool IsValid() const { return fd_.get() >= 0; }
 
  private:
   UniqueFileDescriptor::Type fd_;

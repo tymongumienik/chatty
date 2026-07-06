@@ -24,11 +24,11 @@ void Client::Stop() {
       {};  // move assignment will take care of deinitializing old jthread
 
   if (tcp_server_) {
-    tcp_server_->close();
+    tcp_server_->Close();
     tcp_server_.reset();
   }
   if (tcp_socket_) {
-    tcp_socket_->close();
+    tcp_socket_->Close();
     tcp_socket_.reset();
   }
   role_ = ClientRole::None;
@@ -77,9 +77,9 @@ void Client::NetworkLoop(std::stop_token st) {
         }
 
         if (command.type == Command::Type::SendMessage) {
-          if (tcp_socket_ && tcp_socket_->isValid()) {
+          if (tcp_socket_ && tcp_socket_->IsValid()) {
             try {
-              tcp_socket_->sendRaw(command.payload);
+              tcp_socket_->SendRaw(command.payload);
             } catch (const std::exception&) {
               HandlePeerDisconnected();
             }
@@ -93,11 +93,11 @@ void Client::NetworkLoop(std::stop_token st) {
             discovery_socket.reset();
           }
           if (tcp_server_) {
-            tcp_server_->close();
+            tcp_server_->Close();
             tcp_server_.reset();
           }
           if (tcp_socket_) {
-            tcp_socket_->close();
+            tcp_socket_->Close();
             tcp_socket_.reset();
           }
         }
@@ -120,7 +120,7 @@ void Client::NetworkLoop(std::stop_token st) {
 
       if (stage_ == ClientStage::Chatting && tcp_socket_) {
         while (stage_ == ClientStage::Chatting && tcp_socket_) {
-          auto result = tcp_socket_->receiveRaw();
+          auto result = tcp_socket_->ReceiveRaw();
           if (result.status == RecvStatus::WouldBlock) {
             break;
           }
@@ -156,11 +156,11 @@ void Client::BroadcastDiscovery(
 
   if (now - last_discover_sent >= std::chrono::seconds(1)) {
     DiscoverPacket packet;
-    packet.instanceId = instance_id_;
-    packet.tcpPort = 0;  // 0 signifies "You host"
+    packet.instance_id = instance_id_;
+    packet.tcp_port = 0;  // 0 signifies "You host"
     packet.username = username_;
     try {
-      discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
+      discovery_socket.SendPacket(std::string(Constants::DISCOVERY_ADDRESS),
                                   Constants::DISCOVERY_PORT, packet);
     } catch (const std::exception&) {
       // Ignore packet transmission error
@@ -172,12 +172,12 @@ void Client::BroadcastDiscovery(
 void Client::ProcessDiscoveryPackets(
     std::optional<UdpSocket>& discovery_socket) {
   while (discovery_socket) {
-    auto datagram = discovery_socket->receiveRaw();
+    auto datagram = discovery_socket->ReceiveRaw();
     if (!datagram) {
       break;
     }
 
-    auto packet = Packet::parse(datagram->data);
+    auto packet = Packet::Parse(datagram->data);
     if (!packet)
       continue;
 
@@ -189,12 +189,12 @@ void Client::ProcessDiscoveryPackets(
 
     if (auto* discover = dynamic_cast<DiscoverPacket*>(packet.get())) {
       is_discover = true;
-      remote_instance_id = discover->instanceId;
-      remote_tcp_port = discover->tcpPort;
+      remote_instance_id = discover->instance_id;
+      remote_tcp_port = discover->tcp_port;
       remote_username = discover->username;
     } else if (auto* hello = dynamic_cast<HelloPacket*>(packet.get())) {
-      remote_instance_id = hello->instanceId;
-      remote_tcp_port = hello->tcpPort;
+      remote_instance_id = hello->instance_id;
+      remote_tcp_port = hello->tcp_port;
       remote_username = hello->username;
     }
 
@@ -222,15 +222,15 @@ void Client::ProcessDiscoveryPackets(
       } else {
         // send hello packet to wake up the other server for them to host for us
         HelloPacket hello;
-        hello.instanceId = instance_id_;
-        hello.tcpPort = 0;
+        hello.instance_id = instance_id_;
+        hello.tcp_port = 0;
         hello.username = username_;
         try {
-          discovery_socket->sendPacket(
+          discovery_socket->SendPacket(
               std::string(Constants::DISCOVERY_ADDRESS),
               Constants::DISCOVERY_PORT, hello);
         } catch (const std::exception&) {
-          // Ignore UDP send error
+          // ignore UDP send error
         }
       }
     }
@@ -252,18 +252,18 @@ void Client::StartHostingSession(const std::string& peer_ip,
       tcp_server_.emplace(0);  // automatic port
     }
 
-    peer_tcp_port_ = tcp_server_->getPort();
+    peer_tcp_port_ = tcp_server_->GetPort();
 
     HelloPacket hello;
-    hello.instanceId = instance_id_;
-    hello.tcpPort = tcp_server_->getPort();
+    hello.instance_id = instance_id_;
+    hello.tcp_port = tcp_server_->GetPort();
     hello.username = username_;
-    discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
+    discovery_socket.SendPacket(std::string(Constants::DISCOVERY_ADDRESS),
                                 Constants::DISCOVERY_PORT, hello);
   } catch (const std::exception&) {
     role_ = ClientRole::None;
     if (tcp_server_) {
-      tcp_server_->close();
+      tcp_server_->Close();
       tcp_server_.reset();
     }
     peer_tcp_port_ = 0;
@@ -276,7 +276,7 @@ bool Client::PollIncomingConnection(
     return false;
   }
 
-  if (auto accepted = tcp_server_->accept()) {
+  if (auto accepted = tcp_server_->Accept()) {
     // validate that the connecting peer matches the expected address
     std::string expected_ip;
     {
@@ -297,7 +297,7 @@ bool Client::PollIncomingConnection(
     }
 
     // close the server socket (we connect to the other peer)
-    tcp_server_->close();
+    tcp_server_->Close();
     tcp_server_.reset();
 
     discovery_socket.reset();
@@ -310,12 +310,12 @@ bool Client::PollIncomingConnection(
 
 void Client::HandlePeerDisconnected() {
   if (tcp_socket_) {
-    tcp_socket_->close();
+    tcp_socket_->Close();
     tcp_socket_.reset();
   }
 
   if (tcp_server_) {
-    tcp_server_->close();
+    tcp_server_->Close();
     tcp_server_.reset();
   }
 
@@ -348,7 +348,7 @@ bool Client::ConnectToPeerHost(const std::string& peer_ip,
 
   // initiate TCP connection to the responder's hosting port
   tcp_socket_.emplace();
-  if (tcp_socket_->connect(peer_ip, peer_tcp_port_)) {
+  if (tcp_socket_->Connect(peer_ip, peer_tcp_port_)) {
     stage_ = ClientStage::Chatting;
     discovery_socket.reset();
     interop_.on_peer_found(remote_username);

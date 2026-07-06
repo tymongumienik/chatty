@@ -33,10 +33,10 @@ TcpServer::TcpServer(std::uint16_t port)
     throw std::runtime_error("TCP set non-blocking failed");
   }
 
-  bindAndListen();
+  BindAndListen();
 }
 
-std::optional<TcpServer::AcceptResult> TcpServer::accept() {
+std::optional<TcpServer::AcceptResult> TcpServer::Accept() {
   sockaddr_in peer_addr{};
   socklen_t peer_len = sizeof(peer_addr);
 
@@ -75,11 +75,11 @@ std::optional<TcpServer::AcceptResult> TcpServer::accept() {
   };
 }
 
-void TcpServer::close() {
+void TcpServer::Close() {
   fd_.reset();
 }
 
-void TcpServer::bindAndListen() {
+void TcpServer::BindAndListen() {
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);

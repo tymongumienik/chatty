@@ -9,29 +9,29 @@
 namespace Networking {
 struct Packet {
   virtual ~Packet() = default;
-  virtual std::string getBreadcrumb() const = 0;
-  virtual std::string serialize() const = 0;
+  virtual std::string GetBreadcrumb() const = 0;
+  virtual std::string Serialize() const = 0;
 
-  static std::unique_ptr<Packet> parse(const std::string& rawData);
+  static std::unique_ptr<Packet> Parse(const std::string& raw_data);
 };
 
 struct HelloPacket : Packet {
-  std::uint16_t tcpPort{};
-  std::string instanceId;
+  std::uint16_t tcp_port{};
+  std::string instance_id;
   std::string username;
 
-  std::string getBreadcrumb() const override { return "HELLO"; }
+  std::string GetBreadcrumb() const override { return "HELLO"; }
 
-  std::string serialize() const override;
+  std::string Serialize() const override;
 };
 
 struct DiscoverPacket : Packet {
-  std::uint16_t tcpPort{};
-  std::string instanceId;
+  std::uint16_t tcp_port{};
+  std::string instance_id;
   std::string username;
 
-  std::string getBreadcrumb() const override { return "DISCOVER"; }
+  std::string GetBreadcrumb() const override { return "DISCOVER"; }
 
-  std::string serialize() const override;
+  std::string Serialize() const override;
 };
 }  // namespace Networking

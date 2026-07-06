@@ -4,15 +4,15 @@
 #include <memory>
 #include "constants.hpp"
 
-std::string Networking::HelloPacket::serialize() const {
-  return std::format("{} {} {} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
-                     Constants::PROTOCOL_VERSION, tcpPort, instanceId,
+std::string Networking::HelloPacket::Serialize() const {
+  return std::format("{} {} {} {} {} {}", GetBreadcrumb(), Constants::APP_NAME,
+                     Constants::PROTOCOL_VERSION, tcp_port, instance_id,
                      username);
 }
 
-std::string Networking::DiscoverPacket::serialize() const {
-  return std::format("{} {} {} {} {} {}", getBreadcrumb(), Constants::APP_NAME,
-                     Constants::PROTOCOL_VERSION, tcpPort, instanceId,
+std::string Networking::DiscoverPacket::Serialize() const {
+  return std::format("{} {} {} {} {} {}", GetBreadcrumb(), Constants::APP_NAME,
+                     Constants::PROTOCOL_VERSION, tcp_port, instance_id,
                      username);
 }
 
@@ -38,7 +38,7 @@ std::string_view next_token(std::string_view& view) {
   const auto space_pos = view.find(' ');
   if (space_pos == std::string_view::npos) {
     std::string_view token = view;
-    view = {};  // Mark the remaining view as empty
+    view = {};  // mark the remaining view as empty
     return token;
   }
 
@@ -48,7 +48,7 @@ std::string_view next_token(std::string_view& view) {
   return token;
 }
 
-// Returns everything remaining in view (trimmed of leading spaces)
+// returns everything remaining in view (trimmed of leading spaces)
 std::string_view rest_of(std::string_view& view) {
   const auto first_non_space = view.find_first_not_of(' ');
   if (first_non_space == std::string_view::npos) {
@@ -62,62 +62,62 @@ std::string_view rest_of(std::string_view& view) {
 }
 }  // namespace
 
-std::unique_ptr<Networking::Packet> Networking::Packet::parse(
-    const std::string& rawData) {
-  if (rawData.size() > Constants::MAX_PACKET_SIZE || rawData.empty()) {
+std::unique_ptr<Networking::Packet> Networking::Packet::Parse(
+    const std::string& raw_data) {
+  if (raw_data.size() > Constants::MAX_PACKET_SIZE || raw_data.empty()) {
     return nullptr;
   }
 
-  std::string_view view(rawData);
+  std::string_view view(raw_data);
 
   std::string_view breadcrumb = next_token(view);
-  std::string_view appName = next_token(view);
-  std::string_view protocolVersion = next_token(view);
+  std::string_view app_name = next_token(view);
+  std::string_view protocol_version_str = next_token(view);
 
-  if (breadcrumb.empty() || appName != Constants::APP_NAME) {
+  if (breadcrumb.empty() || app_name != Constants::APP_NAME) {
     return nullptr;
   }
 
-  std::uint16_t proto_version = 0;
-  if (!safe_to_uint16(protocolVersion, proto_version) ||
-      proto_version != Constants::PROTOCOL_VERSION) {
+  std::uint16_t protocol_version = 0;
+  if (!safe_to_uint16(protocol_version_str, protocol_version) ||
+      protocol_version != Constants::PROTOCOL_VERSION) {
     return nullptr;
   }
 
   if (breadcrumb == "HELLO") {
-    std::string_view portStr = next_token(view);
-    std::string_view instanceId = next_token(view);
+    std::string_view port_str = next_token(view);
+    std::string_view instance_id = next_token(view);
     std::string_view username = rest_of(view);
 
-    if (portStr.empty() || instanceId.empty())
+    if (port_str.empty() || instance_id.empty())
       return nullptr;
 
-    std::uint16_t tcpPort = 0;
-    if (!safe_to_uint16(portStr, tcpPort))
+    std::uint16_t tcp_port_local = 0;
+    if (!safe_to_uint16(port_str, tcp_port_local))
       return nullptr;
 
     auto packet = std::make_unique<Networking::HelloPacket>();
-    packet->tcpPort = tcpPort;
-    packet->instanceId = std::string(instanceId);
+    packet->tcp_port = tcp_port_local;
+    packet->instance_id = std::string(instance_id);
     packet->username = std::string(username);
     return packet;
   }
 
   if (breadcrumb == "DISCOVER") {
-    std::string_view portStr = next_token(view);
-    std::string_view instanceId = next_token(view);
+    std::string_view port_str = next_token(view);
+    std::string_view instance_id = next_token(view);
     std::string_view username = rest_of(view);
 
-    if (portStr.empty() || instanceId.empty())
+    if (port_str.empty() || instance_id.empty())
       return nullptr;
 
-    std::uint16_t tcpPort = 0;
-    if (!safe_to_uint16(portStr, tcpPort))
+    std::uint16_t tcp_port_local = 0;
+    if (!safe_to_uint16(port_str, tcp_port_local))
       return nullptr;
 
     auto packet = std::make_unique<Networking::DiscoverPacket>();
-    packet->tcpPort = tcpPort;
-    packet->instanceId = std::string(instanceId);
+    packet->tcp_port = tcp_port_local;
+    packet->instance_id = std::string(instance_id);
     packet->username = std::string(username);
     return packet;
   }
