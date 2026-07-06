@@ -50,11 +50,16 @@ void Client::NetworkLoop(std::stop_token st) {
   auto last_discover_sent = std::chrono::steady_clock::time_point{};
 
   while (!st.stop_requested()) {
-    {
-      std::lock_guard lock(commands_mutex_);
-      while (!commands_.empty()) {
-        auto command = std::move(commands_.front());
-        commands_.pop();
+    try {
+      std::queue<Command> local_commands;
+      {
+        std::lock_guard lock(commands_mutex_);
+        std::swap(local_commands, commands_);
+      }
+
+      while (!local_commands.empty()) {
+        auto command = std::move(local_commands.front());
+        local_commands.pop();
 
         if (command.type == Command::Type::SearchPeer) {
           username_ = std::move(command.payload);
@@ -62,7 +67,12 @@ void Client::NetworkLoop(std::stop_token st) {
           role_ = ClientRole::None;
 
           if (!discovery_socket) {
-            discovery_socket.emplace(Constants::DISCOVERY_PORT);
+            try {
+              discovery_socket.emplace(Constants::DISCOVERY_PORT);
+            } catch (const std::exception&) {
+              stage_ = ClientStage::Idle;
+              role_ = ClientRole::None;
+            }
           }
         }
 
@@ -92,36 +102,46 @@ void Client::NetworkLoop(std::stop_token st) {
           }
         }
       }
-    }
 
-    if (stage_ == ClientStage::SearchingForPeer && discovery_socket) {
-      // we broadcast that we are here and ready to host a connection
-      if (role_ == ClientRole::None) {
-        BroadcastDiscovery(*discovery_socket, last_discover_sent);
+      if (stage_ == ClientStage::SearchingForPeer && discovery_socket) {
+        // we broadcast that we are here and ready to host a connection
+        if (role_ == ClientRole::None) {
+          BroadcastDiscovery(*discovery_socket, last_discover_sent);
+        }
+
+        // check if another peer connected to our server
+        if (PollIncomingConnection(discovery_socket)) {
+          continue;
+        }
+
+        // we get a response from another peer
+        ProcessDiscoveryPackets(discovery_socket);
       }
 
-      // check if another peer connected to our server
-      if (PollIncomingConnection(discovery_socket)) {
-        continue;
+      if (stage_ == ClientStage::Chatting && tcp_socket_) {
+        while (stage_ == ClientStage::Chatting && tcp_socket_) {
+          auto result = tcp_socket_->receiveRaw();
+          if (result.status == RecvStatus::WouldBlock) {
+            break;
+          }
+          switch (result.status) {
+            case RecvStatus::Data:
+              interop_.on_message(std::move(result.data));
+              break;
+            case RecvStatus::Closed:
+            case RecvStatus::Error:
+              HandlePeerDisconnected();
+              break;
+            default:
+              break;
+          }
+        }
       }
-
-      // we get a response from another peer
-      ProcessDiscoveryPackets(discovery_socket);
-    }
-
-    if (stage_ == ClientStage::Chatting && tcp_socket_) {
-      auto result = tcp_socket_->receiveRaw();
-      switch (result.status) {
-        case RecvStatus::Data:
-          interop_.on_message(std::move(result.data));
-          break;
-        case RecvStatus::Closed:
-        case RecvStatus::Error:
-          HandlePeerDisconnected();
-          break;
-        case RecvStatus::WouldBlock:
-          break;
+    } catch (const std::exception&) {
+      if (discovery_socket) {
+        discovery_socket.reset();
       }
+      HandlePeerDisconnected();
     }
 
     std::this_thread::sleep_for(
@@ -139,8 +159,12 @@ void Client::BroadcastDiscovery(
     packet.instanceId = instance_id_;
     packet.tcpPort = 0;  // 0 signifies "You host"
     packet.username = username_;
-    discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
-                                Constants::DISCOVERY_PORT, packet);
+    try {
+      discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
+                                  Constants::DISCOVERY_PORT, packet);
+    } catch (const std::exception&) {
+      // Ignore packet transmission error
+    }
     last_discover_sent = now;
   }
 }
@@ -161,10 +185,10 @@ void Client::ProcessDiscoveryPackets(
     std::uint16_t remote_tcp_port = 0;
     std::string remote_username;
 
-    const bool is_discover =
-        dynamic_cast<DiscoverPacket*>(packet.get()) != nullptr;
+    bool is_discover = false;
 
     if (auto* discover = dynamic_cast<DiscoverPacket*>(packet.get())) {
+      is_discover = true;
       remote_instance_id = discover->instanceId;
       remote_tcp_port = discover->tcpPort;
       remote_username = discover->username;
@@ -201,8 +225,13 @@ void Client::ProcessDiscoveryPackets(
         hello.instanceId = instance_id_;
         hello.tcpPort = 0;
         hello.username = username_;
-        discovery_socket->sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
-                                     Constants::DISCOVERY_PORT, hello);
+        try {
+          discovery_socket->sendPacket(
+              std::string(Constants::DISCOVERY_ADDRESS),
+              Constants::DISCOVERY_PORT, hello);
+        } catch (const std::exception&) {
+          // Ignore UDP send error
+        }
       }
     }
   }
@@ -218,18 +247,27 @@ void Client::StartHostingSession(const std::string& peer_ip,
     peer_username_ = remote_username;
   }
 
-  if (!tcp_server_) {
-    tcp_server_.emplace(0);  // automatic port
+  try {
+    if (!tcp_server_) {
+      tcp_server_.emplace(0);  // automatic port
+    }
+
+    peer_tcp_port_ = tcp_server_->getPort();
+
+    HelloPacket hello;
+    hello.instanceId = instance_id_;
+    hello.tcpPort = tcp_server_->getPort();
+    hello.username = username_;
+    discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
+                                Constants::DISCOVERY_PORT, hello);
+  } catch (const std::exception&) {
+    role_ = ClientRole::None;
+    if (tcp_server_) {
+      tcp_server_->close();
+      tcp_server_.reset();
+    }
+    peer_tcp_port_ = 0;
   }
-
-  peer_tcp_port_ = tcp_server_->getPort();
-
-  HelloPacket hello;
-  hello.instanceId = instance_id_;
-  hello.tcpPort = tcp_server_->getPort();
-  hello.username = username_;
-  discovery_socket.sendPacket(std::string(Constants::DISCOVERY_ADDRESS),
-                              Constants::DISCOVERY_PORT, hello);
 }
 
 bool Client::PollIncomingConnection(

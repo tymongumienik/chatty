@@ -31,8 +31,8 @@ class App {
   ftxui::ScreenInteractive screen_;
   AppState state_;
   int tab_index_ = 0;
-  Networking::Client network_;
   std::mutex state_mutex_;
+  Networking::Client network_;
 
   ftxui::Component MakeNameInputScreen();
   ftxui::Component MakeWaitingForPeerScreen();

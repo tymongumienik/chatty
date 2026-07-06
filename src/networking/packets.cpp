@@ -17,7 +17,6 @@ std::string Networking::DiscoverPacket::serialize() const {
 }
 
 namespace {  // scoped
-// WIP
 bool safe_to_uint16(std::string_view str, std::uint16_t& out_value) {
   if (str.empty())
     return false;
@@ -28,7 +27,6 @@ bool safe_to_uint16(std::string_view str, std::uint16_t& out_value) {
   return (ec == std::errc{} && ptr == str.data() + str.size());
 }
 
-// WIP
 std::string_view next_token(std::string_view& view) {
   const auto first_non_space = view.find_first_not_of(' ');
   if (first_non_space == std::string_view::npos) {

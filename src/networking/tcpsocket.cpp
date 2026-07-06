@@ -15,18 +15,23 @@ namespace Networking {
 TcpSocket::TcpSocket(UniqueFileDescriptor::Type fd) : fd_(std::move(fd)) {}
 
 bool TcpSocket::connect(const std::string& ip, std::uint16_t port) {
+  if (fd_.get() >= 0) {
+    close();
+  }
+  recv_buffer_.clear();
+
+  fd_ = UniqueFileDescriptor::make(::socket(AF_INET, SOCK_STREAM, 0));
   if (fd_.get() < 0) {
-    fd_ = UniqueFileDescriptor::make(::socket(AF_INET, SOCK_STREAM, 0));
-    if (fd_.get() < 0) {
-      return false;
-    }
+    return false;
   }
 
   int flags = ::fcntl(fd_.get(), F_GETFL);
   if (flags < 0) {
+    close();
     return false;
   }
   if (::fcntl(fd_.get(), F_SETFL, flags | O_NONBLOCK) < 0) {
+    close();
     return false;
   }
 
@@ -35,6 +40,7 @@ bool TcpSocket::connect(const std::string& ip, std::uint16_t port) {
   addr.sin_port = htons(port);
 
   if (::inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1) {
+    close();
     return false;
   }
 
@@ -56,15 +62,19 @@ bool TcpSocket::connect(const std::string& ip, std::uint16_t port) {
         socklen_t optlen = sizeof(optval);
         if (::getsockopt(fd_.get(), SOL_SOCKET, SO_ERROR, &optval, &optlen) <
             0) {
+          close();
           return false;
         }
         if (optval != 0) {
+          close();
           return false;
         }
       } else {
+        close();
         return false;
       }
     } else {
+      close();
       return false;
     }
   }
@@ -72,8 +82,16 @@ bool TcpSocket::connect(const std::string& ip, std::uint16_t port) {
   // disable Nagle's algorithm for low-latency chat
   // enable keepalive to detect dead peers
   int yes = 1;
-  ::setsockopt(fd_.get(), IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
-  ::setsockopt(fd_.get(), SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes));
+  if (::setsockopt(fd_.get(), IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) <
+      0) {
+    close();
+    return false;
+  }
+  if (::setsockopt(fd_.get(), SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) <
+      0) {
+    close();
+    return false;
+  }
 
   return true;
 }
@@ -140,7 +158,27 @@ RecvResult TcpSocket::receiveRaw() {
     return {RecvStatus::Error, {}};
   }
 
-  // read any available data
+  // First, check if we already have a complete message in the buffer
+  if (recv_buffer_.size() >= Constants::MESSAGE_LENGTH_PREFIX_SIZE) {
+    std::uint32_t net_len;
+    std::memcpy(&net_len, recv_buffer_.data(),
+                Constants::MESSAGE_LENGTH_PREFIX_SIZE);
+    std::uint32_t msg_len = ntohl(net_len);
+
+    if (msg_len > Constants::MAX_MESSAGE_SIZE) {
+      return {RecvStatus::Error, {}};
+    }
+
+    std::size_t frame_size = Constants::MESSAGE_LENGTH_PREFIX_SIZE + msg_len;
+    if (recv_buffer_.size() >= frame_size) {
+      std::string message =
+          recv_buffer_.substr(Constants::MESSAGE_LENGTH_PREFIX_SIZE, msg_len);
+      recv_buffer_.erase(0, frame_size);
+      return {RecvStatus::Data, std::move(message)};
+    }
+  }
+
+  // If not, read any available data
   char buff[Constants::MAX_PACKET_SIZE];
   ssize_t n;
   do {
@@ -155,7 +193,7 @@ RecvResult TcpSocket::receiveRaw() {
     return {RecvStatus::Error, {}};
   }
 
-  // non-full message
+  // Check again after appending new data
   if (recv_buffer_.size() < Constants::MESSAGE_LENGTH_PREFIX_SIZE) {
     return {RecvStatus::WouldBlock, {}};
   }
@@ -184,6 +222,7 @@ RecvResult TcpSocket::receiveRaw() {
 
 void TcpSocket::close() {
   fd_.reset();
+  recv_buffer_.clear();
 }
 
 }  // namespace Networking

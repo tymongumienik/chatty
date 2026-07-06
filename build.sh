@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e
 mkdir -p build
 cmake -B build
-make -C build
+cmake --build build

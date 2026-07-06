@@ -27,9 +27,22 @@ ftxui::Component App::MakeNameInputScreen() {
                              },
                          .on_enter =
                              [this, ui_username] {
+                               std::string trimmed;
+                               {
+                                 std::string raw = *ui_username;
+                                 auto start = raw.find_first_not_of(" \t\r\n");
+                                 if (start != std::string::npos) {
+                                   auto end = raw.find_last_not_of(" \t\r\n");
+                                   trimmed = raw.substr(start, end - start + 1);
+                                 }
+                               }
+                               if (trimmed.empty() || trimmed.length() > 32) {
+                                 return;
+                               }
                                {
                                  std::lock_guard<std::mutex> lock(state_mutex_);
-                                 state_.username = *ui_username;
+                                 state_.username = trimmed;
+                                 *ui_username = trimmed;
                                }
                                SetStage(AppStage::WaitingForPeer);
                              },

@@ -1,6 +1,5 @@
 #include "app.hpp"
 #include "networking/client.hpp"
-#include "networking/filedescriptor.hpp"
 
 App::App()
     : screen_(ftxui::ScreenInteractive::Fullscreen()),
@@ -32,12 +31,19 @@ App::App()
 }
 
 void App::SetStage(AppStage stage) {
-  std::lock_guard lock(state_mutex_);
-  if (stage == AppStage::WaitingForPeer) {
-    network_.SearchPeer(state_.username);
+  std::string username_to_search;
+  {
+    std::lock_guard lock(state_mutex_);
+    if (stage == AppStage::WaitingForPeer) {
+      username_to_search = state_.username;
+    }
+    state_.stage = stage;
+    tab_index_ = static_cast<int>(stage);
   }
-  state_.stage = stage;
-  tab_index_ = static_cast<int>(stage);
+
+  if (!username_to_search.empty()) {
+    network_.SearchPeer(username_to_search);
+  }
 }
 
 void App::ResetAfterPeerDisconnected() {

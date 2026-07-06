@@ -74,10 +74,9 @@ void test_fd_default_deleter_closes() {
     auto resource = UniqueFileDescriptor::make(fd);
   }  // should close fd
 
-  // writing to a closed fd should fail
-  char c = 0;
-  ssize_t n = ::read(fd, &c, 1);
-  assert(n < 0);  // EBADF
+  // checking a closed fd should fail with EBADF
+  int res = ::fcntl(fd, F_GETFD);
+  assert(res < 0 && errno == EBADF);
 }
 
 // ─── tcp server/client tests ──────────────────────────────────────────

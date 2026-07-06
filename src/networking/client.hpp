@@ -95,7 +95,7 @@ class Client {
 
   mutable std::mutex data_mutex_;
 
-  ClientStage stage_ = ClientStage::Idle;
+  std::atomic<ClientStage> stage_ = ClientStage::Idle;
   std::atomic<ClientRole> role_ = ClientRole::None;
   std::string username_;
   std::string instance_id_;
