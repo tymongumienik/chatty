@@ -7,18 +7,22 @@ ftxui::Component App::MakeWaitingForPeerScreen() {
   using namespace ftxui;
 
   auto back_btn = Button("Back", [this] { SetStage(AppStage::NameInput); });
-  auto skip_btn = Button("Skip", [this] { SetStage(AppStage::Chatting); });
 
-  auto container = Container::Vertical({back_btn, skip_btn});
+  auto container = Container::Vertical({back_btn});
 
-  return Renderer(container, [this, back_btn, skip_btn] {
+  return Renderer(container, [this, back_btn] {
+    std::string username;
+    {
+      std::lock_guard lock(state_mutex_);
+      username = state_.username;
+    }
+
     return center(vbox({
-        text("Connected as: " + state_.username),
+        text("Connected as: " + username),
         filler(),
         text("Waiting for a peer to connect..."),
         filler(),
         back_btn->Render(),
-        skip_btn->Render(),
     }));
   });
 }

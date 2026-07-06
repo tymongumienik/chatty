@@ -1,0 +1,3 @@
+[submodule "src/lib/unique_resource"]
+	path = src/lib/unique_resource
+	url = https://github.com/okdshin/unique_resource

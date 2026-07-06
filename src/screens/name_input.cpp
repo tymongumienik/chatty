@@ -2,29 +2,57 @@
 #include "ftxui/dom/elements.hpp"
 #include "ftxui/screen/color.hpp"
 
+#include <memory>
+
 #include "app.hpp"
 #include "constants.hpp"
 
 ftxui::Component App::MakeNameInputScreen() {
   using namespace ftxui;
 
-  auto input =
-      Input(&state_.username, "username",
-            InputOption{
-                .transform =
-                    [](InputState s) {
-                      return s.element | bgcolor(Color::Default) |
-                             color(Color::White);
-                    },
-                .multiline = false,
-                .on_enter = [this] { SetStage(AppStage::WaitingForPeer); },
-            });
+  auto ui_username = std::make_shared<std::string>();
+
+  auto input = Input(ui_username.get(), "username",
+                     InputOption{
+                         .transform =
+                             [](InputState s) {
+                               return s.element | bgcolor(Color::Default) |
+                                      color(Color::White);
+                             },
+                         .multiline = false,
+                         .on_change =
+                             [this, ui_username] {
+                               std::lock_guard<std::mutex> lock(state_mutex_);
+                               state_.username = *ui_username;
+                             },
+                         .on_enter =
+                             [this, ui_username] {
+                               std::string trimmed;
+                               {
+                                 std::string raw = *ui_username;
+                                 auto start = raw.find_first_not_of(" \t\r\n");
+                                 if (start != std::string::npos) {
+                                   auto end = raw.find_last_not_of(" \t\r\n");
+                                   trimmed = raw.substr(start, end - start + 1);
+                                 }
+                               }
+                               if (trimmed.empty() || trimmed.length() > 32) {
+                                 return;
+                               }
+                               {
+                                 std::lock_guard<std::mutex> lock(state_mutex_);
+                                 state_.username = trimmed;
+                                 *ui_username = trimmed;
+                               }
+                               SetStage(AppStage::WaitingForPeer);
+                             },
+                     });
 
   auto container = Container::Vertical({input});
 
   return Renderer(container, [this, input] {
     Elements art_nodes;
-    for (const auto& line : ASCII_ART) {
+    for (const auto& line : Constants::ASCII_ART) {
       art_nodes.push_back(text(std::string(line)));
     }
 
