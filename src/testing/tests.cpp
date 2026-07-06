@@ -2,7 +2,6 @@
 #include <atomic>
 #include <cassert>
 #include <chrono>
-#include <print>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
@@ -402,17 +401,9 @@ int main(int argc, char* argv[]) {
       {"test_unique_id_hex_chars", test_unique_id_hex_chars},
   };
 
-  if (argc == 2 && std::string_view(argv[1]) == "--list") {
-    for (auto& [name, fn] : tests) {
-      std::println("{}", name);
-    }
-    return 0;
-  }
-
   if (argc == 2) {
     auto it = tests.find(argv[1]);
     if (it == tests.end()) {
-      std::println(stderr, "Unknown test: {}", argv[1]);
       return 1;
     }
     it->second();
