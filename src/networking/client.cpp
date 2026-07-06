@@ -40,6 +40,11 @@ void Client::SearchPeer(std::string username) {
   commands_.push(Command{Command::Type::SearchPeer, std::move(username)});
 }
 
+void Client::Cancel() {
+  std::lock_guard lock(commands_mutex_);
+  commands_.push(Command{Command::Type::Stop, ""});
+}
+
 void Client::SendMessage(std::string text) {
   std::lock_guard lock(commands_mutex_);
   commands_.push(Command{Command::Type::SendMessage, std::move(text)});

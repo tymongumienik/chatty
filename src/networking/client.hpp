@@ -51,6 +51,7 @@ class Client {
   void Stop();
 
   void SearchPeer(std::string username);
+  void Cancel();
   void SendMessage(std::string text);
 
   std::string GetPeerIp() const {
